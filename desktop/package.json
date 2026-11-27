@@ -1,0 +1,18 @@
+{
+  "name": "superfood",
+  "version": "0.1.0",
+  "description": "SuperFood — рецепты, меню на неделю и список покупок",
+  "main": "main.js",
+  "productName": "SuperFood",
+  "author": "Max",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "node stage.js && electron .",
+    "build": "node stage.js && node build.js"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.3.6",
+    "electron": "^33.2.1"
+  }
+}

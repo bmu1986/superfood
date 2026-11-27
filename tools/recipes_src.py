@@ -1,8 +1,9 @@
 # Starter recipes. Run: python3 recipes_src.py -> ../data/recipes.json
 import json, csv
 R = []
-def r(title, role, meals, serv, time, items, steps, side=0, sauce=0, tags=(), out=None):
-    R.append(dict(title=title, role=role, meals=meals, servings=serv, time=time, items=items, steps=steps, needs_side=side, needs_sauce=sauce, tags=list(tags), out_g=out))
+BASE = 1795788000000  # catalog time of the first release; a new or changed recipe gets updated=<now in ms> so devices take it
+def r(title, role, meals, serv, time, items, steps, side=0, sauce=0, tags=(), out=None, updated=BASE):
+    R.append(dict(title=title, role=role, meals=meals, servings=serv, time=time, items=items, steps=steps, needs_side=side, needs_sauce=sauce, tags=list(tags), out_g=out, updated=updated))
 # --- breakfasts
 r('Овсянка с ягодами','breakfast','b',2,10,[('Овсяные хлопья',100,'г'),('Молоко 2,5%',300,'мл'),('Вода',100,'мл'),('Ягоды замороженные',100,'г'),('Мёд',1,'ст.л.')],'Хлопья залить молоком с водой, варить 5 минут. Добавить ягоды и мёд.',out=600)
 r('Овсянка на воде с бананом','breakfast','b',2,10,[('Овсяные хлопья',100,'г'),('Вода',400,'мл'),('Банан',1,'шт'),('Грецкие орехи',20,'г'),('Соль',1,'щепотка')],'Хлопья сварить на воде, сверху банан кружками и орехи.',out=600)
@@ -80,7 +81,7 @@ for x in R:
         assert n.lower() in prods, (x['title'], n)
         assert u in UNITS, u
         items.append([prods[n.lower()], n, q, u])
-    out.append({**x, 'id': rid, 'items': items, 'updated': 1795788000000})
+    out.append({**x, 'id': rid, 'items': items})
 assert len({o['id'] for o in out}) == len(out)
 json.dump(out, open('../data/recipes.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
 print(len(out))

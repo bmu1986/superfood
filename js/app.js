@@ -3,7 +3,7 @@
 (function () {
   const { Store, Blobs, IDB, uid, Dropbox, startAuth, finishAuth, sync, photoBytes, Pending } = window.SF;
   const F = window.Food;
-  const VERSION = '0.2.0';
+  const VERSION = '0.2.1';
 
   // ---------- DOM helpers ----------
   const $ = (s, r = document) => r.querySelector(s);
@@ -929,27 +929,86 @@
   }
 
   // ---------- dish photos: own picture or found on the internet, cropped to 4:3 ----------
-  const RU_EN = { 'борщ': 'borscht', 'щи': 'shchi soup', 'уха': 'ukha fish soup', 'плов': 'pilaf', 'гречк': 'buckwheat', 'овсян': 'oatmeal', 'сырник': 'syrniki', 'омлет': 'omelette', 'каша': 'porridge',
-    'суп': 'soup', 'салат': 'salad', 'винегрет': 'vinegret salad', 'курин': 'chicken', 'куриц': 'chicken', 'грудк': 'chicken breast', 'индейк': 'turkey', 'говядин': 'beef', 'свинин': 'pork', 'котлет': 'cutlets',
+  const RU_EN = { 'борщ': 'borscht', 'щи': 'shchi', 'уха': 'fish soup', 'плов': 'pilaf', 'гречк': 'buckwheat', 'овсян': 'oatmeal', 'сырник': 'syrniki', 'омлет': 'omelette', 'каша': 'porridge',
+    'суп': 'soup', 'салат': 'salad', 'винегрет': 'vinegret', 'курин': 'chicken', 'куриц': 'chicken', 'грудк': 'chicken breast', 'индейк': 'turkey', 'говядин': 'beef', 'свинин': 'pork', 'котлет': 'cutlets',
     'тефтел': 'meatballs', 'треск': 'cod', 'сёмг': 'salmon', 'семг': 'salmon', 'лосос': 'salmon', 'минтай': 'pollock', 'судак': 'zander', 'рыб': 'fish', 'кревет': 'shrimp', 'макарон': 'pasta', 'паста': 'pasta',
-    'рис': 'rice', 'булгур': 'bulgur', 'картоф': 'potato', 'пюре': 'mashed potatoes', 'фасол': 'beans', 'стручков': 'green beans', 'брокколи': 'broccoli', 'капуст': 'cabbage', 'тушён': 'stew', 'рагу': 'vegetable stew',
-    'грибн': 'mushroom', 'гриб': 'mushrooms', 'тыкв': 'pumpkin', 'чечевиц': 'lentil', 'нут': 'chickpea', 'хумус': 'hummus', 'творог': 'cottage cheese', 'йогурт': 'yogurt', 'гранол': 'granola', 'ягод': 'berries',
-    'яблок': 'apple', 'банан': 'banana', 'соус': 'sauce', 'подлив': 'gravy', 'печень': 'liver', 'запечён': 'baked', 'запечен': 'baked', 'пару': 'steamed', 'овощ': 'vegetables', 'тост': 'toast', 'авокадо': 'avocado', 'лобио': 'lobio' };
-  const toEnglish = (q) => { const w = F.norm(q).split(' '); const out = []; for (const x of w) { const k = Object.keys(RU_EN).find((s) => x.startsWith(s)); if (k && !out.includes(RU_EN[k])) out.push(RU_EN[k]); } return out.join(' ') || q; };
-  async function searchPhotos(q) {
+    'спагетти': 'spaghetti', 'рис': 'rice', 'булгур': 'bulgur', 'картоф': 'potatoes', 'пюре': 'mashed potatoes', 'фасол': 'beans', 'стручков': 'green beans', 'брокколи': 'broccoli', 'капуст': 'cabbage',
+    'рагу': 'stew', 'тушён': 'stew', 'тушен': 'stew', 'гриб': 'mushrooms', 'шампиньон': 'mushrooms', 'тыкв': 'pumpkin', 'чечевиц': 'lentils', 'нут': 'chickpeas', 'хумус': 'hummus', 'творог': 'cottage cheese',
+    'йогурт': 'yogurt', 'гранол': 'granola', 'ягод': 'berries', 'яблок': 'apple', 'банан': 'banana', 'соус': 'sauce', 'подлив': 'gravy', 'печень': 'liver', 'запечён': 'baked', 'запечен': 'baked', 'пару': 'steamed',
+    'овощ': 'vegetables', 'тост': 'toast', 'авокадо': 'avocado', 'лобио': 'lobio', 'тунец': 'tuna', 'тунц': 'tuna', 'сыр': 'cheese', 'яйц': 'eggs', 'яичниц': 'fried eggs', 'помидор': 'tomato', 'томат': 'tomato',
+    'огур': 'cucumber', 'перец': 'pepper', 'перц': 'pepper', 'баклажан': 'eggplant', 'кабач': 'zucchini', 'свёкл': 'beetroot', 'свекл': 'beetroot', 'шпинат': 'spinach', 'чеснок': 'garlic', 'морков': 'carrot',
+    'блин': 'pancakes', 'оладь': 'fritters', 'пирог': 'pie', 'запеканк': 'casserole', 'голубц': 'cabbage rolls', 'пельмен': 'pelmeni', 'вареник': 'vareniki', 'шашлык': 'shashlik', 'жарен': 'fried',
+    'сметан': 'sour cream', 'молок': 'milk', 'кефир': 'kefir', 'смузи': 'smoothie', 'хлеб': 'bread', 'бутерброд': 'sandwich', 'шакшук': 'shakshuka', 'кускус': 'couscous', 'киноа': 'quinoa', 'перлов': 'barley',
+    'пшён': 'millet', 'пшен': 'millet', 'кукуруз': 'corn', 'горох': 'pea', 'кальмар': 'squid', 'мидии': 'mussels', 'форел': 'trout', 'скумбри': 'mackerel', 'сельд': 'herring', 'утк': 'duck', 'кролик': 'rabbit',
+    'баранин': 'lamb', 'фарш': 'minced meat', 'гуляш': 'goulash', 'бефстроганов': 'beef stroganoff', 'отбивн': 'chop', 'стейк': 'steak', 'крылыш': 'chicken wings', 'бедр': 'chicken thighs', 'филе': 'fillet',
+    'орех': 'nuts', 'мёд': 'honey', 'мед': 'honey', 'груш': 'pear', 'апельсин': 'orange', 'лимон': 'lemon', 'зелен': 'greens', 'рукол': 'arugula', 'цезар': 'caesar salad', 'греческ': 'greek salad', 'оливье': 'olivier salad' };
+  const toEnglish = (q) => { const w = F.norm(q).split(' '); const out = []; for (const x of w) { const k = Object.keys(RU_EN).filter((s) => x.startsWith(s)).sort((a, b) => b.length - a.length)[0]; if (k && !out.includes(RU_EN[k])) out.push(RU_EN[k]); } return out.join(' '); };
+  // JSONP for sources without CORS (Flickr feed)
+  let jsonpN = 0;
+  const jsonp = (url, cb = 'jsoncallback') => new Promise((res) => {
+    const name = `__sfj${++jsonpN}`;
+    const s = document.createElement('script');
+    const end = (v) => { delete window[name]; s.remove(); res(v); };
+    window[name] = end;
+    s.onerror = () => end(null);
+    setTimeout(() => window[name] && end(null), 9000);
+    s.src = `${url}&${cb}=${name}`;
+    document.head.append(s);
+  });
+  // Photo search, many sources at once. Each source reports as soon as it answers (add(list)), so the grid fills quickly.
+  // page 0 is the first search, page 1.. are «Ещё фото».
+  async function searchPhotos(q, page, add) {
     const enc = encodeURIComponent;
     const get = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const [wiki, commons, ov] = await Promise.all([
-      get(`https://ru.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${enc(q)}&gsrlimit=10&prop=pageimages&piprop=thumbnail&pithumbsize=1200`),
-      get(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=${enc(q + ' filetype:bitmap')}&gsrlimit=24&prop=imageinfo&iiprop=url|mime&iiurlwidth=1200`),
-      get(`https://api.openverse.org/v1/images/?q=${enc(toEnglish(q))}&page_size=24&mature=false&extension=jpg`),
-    ]);
-    const out = [];
-    for (const p of Object.values(wiki?.query?.pages || {}).sort((a, b) => a.index - b.index)) if (p.thumbnail) out.push({ thumb: p.thumbnail.source, full: p.thumbnail.source, from: 'Википедия' });
-    for (const p of Object.values(commons?.query?.pages || {}).sort((a, b) => a.index - b.index)) { const ii = p.imageinfo && p.imageinfo[0]; if (ii && /jpe?g|png|webp/.test(ii.mime || '')) out.push({ thumb: ii.thumburl, full: ii.thumburl, from: 'Викисклад' }); }
-    for (const r of ov?.results || []) out.push({ thumb: r.thumbnail, full: r.thumbnail, from: 'Openverse', alt: r.url });
-    const seen = new Set();
-    return out.filter((x) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb));
+    const wm = (pages, from) => Object.values(pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0)).flatMap((p) => {
+      if (p.thumbnail) return [{ thumb: p.thumbnail.source, full: p.thumbnail.source, from }];
+      const ii = p.imageinfo && p.imageinfo[0];
+      return ii && /jpe?g|png|webp/.test(ii.mime || 'image/jpeg') && ii.thumburl ? [{ thumb: ii.thumburl, full: ii.thumburl, from }] : [];
+    });
+    const commons = (s, off, n) => get(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=${enc(s + ' filetype:bitmap')}&gsrlimit=${n}&gsroffset=${off}&prop=imageinfo&iiprop=url|mime&iiurlwidth=960`).then((d) => wm(d?.query?.pages, 'Викисклад'));
+    const wiki = (lang, s) => get(`https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${enc(s)}&gsrlimit=6&prop=pageimages&piprop=thumbnail&pithumbsize=960`).then((d) => wm(d?.query?.pages, 'Википедия'));
+    // Wikidata: the dish's own photo and its English name (better searches in English-language photo banks)
+    const wikidata = async () => {
+      const s = await get(`https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${enc(q)}&language=ru&uselang=ru&type=item&limit=5&format=json&origin=*`);
+      const ids = (s?.search || []).map((x) => x.id);
+      if (!ids.length) return { en: '', list: [] };
+      const e = await get(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${ids.join('|')}&props=claims|labels&languages=en&format=json&origin=*`);
+      const ents = ids.map((id) => e?.entities?.[id]).filter(Boolean);
+      const files = ents.flatMap((x) => (x.claims?.P18 || []).map((c) => c.mainsnak?.datavalue?.value)).filter(Boolean);
+      const en = ents.map((x) => x.labels?.en?.value).find(Boolean) || '';
+      const list = files.length ? await get(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&titles=${enc(files.slice(0, 10).map((f) => 'File:' + f).join('|'))}&prop=imageinfo&iiprop=url|mime&iiurlwidth=960`).then((d) => wm(d?.query?.pages, 'Викиданные')) : [];
+      return { en, list };
+    };
+    const mealdb = async (en) => {
+      const out = [];
+      const s = await get(`https://www.themealdb.com/api/json/v1/1/search.php?s=${enc(en)}`);
+      for (const m of s?.meals || []) out.push(m);
+      // dishes with the main ingredient (chicken, salmon, rice…)
+      for (const w of en.split(' ').filter((x) => x.length > 3).slice(0, 2)) {
+        const f = await get(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${enc(w)}`);
+        for (const m of (f?.meals || []).slice(0, 12)) if (!out.some((o) => o.idMeal === m.idMeal)) out.push(m);
+      }
+      return out.map((m) => ({ thumb: m.strMealThumb + '/preview', full: m.strMealThumb, from: 'TheMealDB', title: m.strMeal }));
+    };
+    const openverse = (en, p) => get(`https://api.openverse.org/v1/images/?q=${enc(en)}&page_size=30&page=${p}&category=photograph&mature=false`)
+      .then((d) => (d?.results || []).map((r) => ({ thumb: r.thumbnail, full: r.url && /\.(jpe?g|png|webp)$/i.test(r.url) && /staticflickr|wikimedia/.test(r.url) ? r.url : r.thumbnail, from: r.source === 'flickr' ? 'Flickr' : 'Openverse', title: r.title })));
+    const flickr = (en) => jsonp(`https://www.flickr.com/services/feeds/photos_public.gne?format=json&tagmode=all&tags=${enc(en.split(' ').slice(0, 3).join(','))}`)
+      .then((d) => (d?.items || []).map((x) => ({ thumb: x.media.m, full: x.media.m.replace('_m.', '_b.'), from: 'Flickr', title: x.title })));
+    const safe = (p) => p.then((l) => add(l || [])).catch(() => add([]));
+    if (page === 0) {
+      const wd = wikidata().catch(() => ({ en: '', list: [] }));
+      const jobs = [safe(wd.then((x) => x.list)), safe(wiki('ru', q)), safe(commons(q, 0, 16))];
+      const { en: label } = await wd;
+      const en = (label && /^[\x20-\x7e]+$/.test(label) ? label : '') || toEnglish(q);
+      if (en) jobs.push(safe(mealdb(en)), safe(wiki('en', en)), safe(openverse(en, 1)), safe(commons(en, 0, 16)), safe(flickr(en)));
+      await Promise.all(jobs);
+      return en;
+    }
+    const en = searchPhotos.en || toEnglish(q);
+    const jobs = [safe(commons(q, 16 * page, 16))];
+    if (en) jobs.push(safe(openverse(en, page + 1)), safe(commons(en, 16 * page, 16)));
+    await Promise.all(jobs);
+    return en;
   }
   // pick a photo for a recipe: resolves with the saved photo hash (or undefined)
   function choosePhoto(query) {
@@ -960,30 +1019,44 @@
       const file = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
       const grid = h('div', { class: 'pgrid' });
       const status = h('p', { class: 'hint', style: { padding: '0 16px' } });
+      const more = h('button', { class: 'btn', style: { margin: '0 16px 24px', width: 'calc(100% - 32px)', display: 'none' } }, 'Ещё фото');
       file.onchange = () => { const f = file.files[0]; if (f) cropPhoto(URL.createObjectURL(f)).then((hash) => { if (hash) finish(hash); }); };
-      let seq = 0;
-      const run = async () => {
-        const my = ++seq;
-        grid.innerHTML = '';
+      let seq = 0, page = 0, seen = new Set(), count = 0;
+      const addList = (my) => (list) => {
+        if (my !== seq) return;
+        for (const sk of grid.querySelectorAll('.pcell.sk')) sk.remove();
+        for (const r of list) {
+          if (!r.thumb || seen.has(r.full) || seen.has(r.thumb)) continue;
+          seen.add(r.full); seen.add(r.thumb);
+          const img = h('img', { src: r.thumb, loading: 'lazy', alt: r.title || '', referrerpolicy: 'no-referrer' });
+          const cell = h('button', { class: 'pcell', title: r.title || '', style: { '--i': count % 12 }, onclick: () => cropPhoto(r.full, r.from).then((hash) => { if (hash) finish(hash); }) }, img, h('small', {}, r.from));
+          img.onerror = () => cell.remove();
+          grid.append(cell);
+          count++;
+        }
+        status.textContent = count ? `Нашлось ${count} фото из разных мест. Нажми на любое: оно обрежется под карточку, кадр можно подвинуть.` : 'Ищу фото…';
+      };
+      const run = async (next) => {
+        const my = next ? seq : ++seq;
+        if (!next) { grid.innerHTML = ''; seen = new Set(); count = 0; page = 0; }
         if (!q.value.trim()) { status.textContent = 'Напиши название блюда.'; return; }
         status.textContent = 'Ищу фото…';
-        for (let i = 0; i < 6; i++) grid.append(h('div', { class: 'pcell sk' }));
-        const res = await searchPhotos(q.value.trim());
+        more.style.display = 'none';
+        if (!next) for (let i = 0; i < 6; i++) grid.append(h('div', { class: 'pcell sk' }));
+        const before = count;
+        const en = await searchPhotos(q.value.trim(), page, addList(my));
         if (my !== seq) return;
-        grid.innerHTML = '';
-        status.textContent = res.length ? 'Нажми на фото: оно обрежется под карточку, положение можно подвинуть.' : (navigator.onLine ? 'Ничего не нашлось. Попробуй короче, например «борщ».' : 'Нет интернета.');
-        res.forEach((r, i) => {
-          const img = h('img', { src: r.thumb, loading: 'lazy', alt: '', referrerpolicy: 'no-referrer' });
-          img.onerror = () => cell.remove();
-          const cell = h('button', { class: 'pcell', style: { '--i': i }, onclick: () => cropPhoto(r.full, r.from).then((hash) => { if (hash) finish(hash); }) }, img, h('small', {}, r.from));
-          grid.append(cell);
-        });
+        if (!next) searchPhotos.en = en;
+        for (const sk of grid.querySelectorAll('.pcell.sk')) sk.remove();
+        if (!count) status.textContent = navigator.onLine ? 'Ничего не нашлось. Попробуй проще, например «борщ» или «курица с рисом».' : 'Нет интернета.';
+        more.style.display = count > before || !next ? (count ? '' : 'none') : 'none';
       };
+      more.onclick = () => { page++; run(true); };
       q.onkeydown = (e) => { if (e.key === 'Enter') run(); };
       const s = sheet('Фото блюда', h('div', {},
-        h('div', { class: 'quick' }, q, h('button', { class: 'btn primary', onclick: run }, 'Найти')),
+        h('div', { class: 'quick' }, q, h('button', { class: 'btn primary', onclick: () => run() }, 'Найти')),
         h('div', { class: 'quick' }, h('button', { class: 'btn', style: { flex: 1 }, onclick: () => file.click() }, 'Своё фото с телефона или компьютера'), file),
-        status, grid), { full: true, onClose: () => { if (!done) resolve(undefined); } });
+        status, grid, more), { full: true, onClose: () => { seq++; if (!done) resolve(undefined); } });
       run();
     });
   }

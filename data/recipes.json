@@ -42,8 +42,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 600,
-"id": "r-ovsyanka-s-yagodami",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-ovsyanka-s-yagodami"
 },
 {
 "title": "Овсянка на воде с бананом",
@@ -88,8 +88,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 600,
-"id": "r-ovsyanka-na-vode-s-bananom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-ovsyanka-na-vode-s-bananom"
 },
 {
 "title": "Сырники",
@@ -134,8 +134,8 @@
 "needs_sauce": 1,
 "tags": [],
 "out_g": 480,
-"id": "r-syrniki",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-syrniki"
 },
 {
 "title": "Омлет с овощами",
@@ -186,8 +186,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": null,
-"id": "r-omlet-s-ovoschami",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-omlet-s-ovoschami"
 },
 {
 "title": "Гречневая каша с молоком",
@@ -226,8 +226,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 650,
-"id": "r-grechnevaya-kasha-s-molokom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-grechnevaya-kasha-s-molokom"
 },
 {
 "title": "Творог с ягодами и мёдом",
@@ -260,8 +260,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": null,
-"id": "r-tvorog-s-yagodami-i-medom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-tvorog-s-yagodami-i-medom"
 },
 {
 "title": "Тосты с авокадо и яйцом",
@@ -306,8 +306,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": null,
-"id": "r-tosty-s-avokado-i-yaytsom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-tosty-s-avokado-i-yaytsom"
 },
 {
 "title": "Пшённая каша с тыквой",
@@ -352,8 +352,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 1100,
-"id": "r-pshennaya-kasha-s-tykvoy",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-pshennaya-kasha-s-tykvoy"
 },
 {
 "title": "Постная овсянка с яблоком и корицей",
@@ -398,8 +398,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 600,
-"id": "r-postnaya-ovsyanka-s-yablokom-i-koritsey",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-postnaya-ovsyanka-s-yablokom-i-koritsey"
 },
 {
 "title": "Йогурт с гранолой",
@@ -432,8 +432,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": null,
-"id": "r-yogurt-s-granoloy",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-yogurt-s-granoloy"
 },
 {
 "title": "Борщ постный",
@@ -514,8 +514,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 3500,
-"id": "r-borsch-postnyy",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-borsch-postnyy"
 },
 {
 "title": "Уха из судака",
@@ -584,8 +584,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 3400,
-"id": "r-uha-iz-sudaka",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-uha-iz-sudaka"
 },
 {
 "title": "Куриный суп с лапшой",
@@ -648,8 +648,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 3200,
-"id": "r-kurinyy-sup-s-lapshoy",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-kurinyy-sup-s-lapshoy"
 },
 {
 "title": "Суп-пюре из чечевицы",
@@ -712,8 +712,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 1700,
-"id": "r-sup-pyure-iz-chechevitsy",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-sup-pyure-iz-chechevitsy"
 },
 {
 "title": "Щи из свежей капусты",
@@ -782,8 +782,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 3400,
-"id": "r-schi-iz-svezhey-kapusty",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-schi-iz-svezhey-kapusty"
 },
 {
 "title": "Грибной суп",
@@ -846,8 +846,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 2700,
-"id": "r-gribnoy-sup",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-gribnoy-sup"
 },
 {
 "title": "Тыквенный крем-суп",
@@ -904,8 +904,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 1500,
-"id": "r-tykvennyy-krem-sup",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-tykvennyy-krem-sup"
 },
 {
 "title": "Гречка с грибами",
@@ -962,8 +962,8 @@
 "needs_sauce": 1,
 "tags": [],
 "out_g": 1400,
-"id": "r-grechka-s-gribami",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-grechka-s-gribami"
 },
 {
 "title": "Плов с овощами и нутом",
@@ -1032,8 +1032,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 2100,
-"id": "r-plov-s-ovoschami-i-nutom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-plov-s-ovoschami-i-nutom"
 },
 {
 "title": "Плов с курицей",
@@ -1102,8 +1102,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 2400,
-"id": "r-plov-s-kuritsey",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-plov-s-kuritsey"
 },
 {
 "title": "Треска запечённая с лимоном",
@@ -1150,8 +1150,8 @@
 "Быстро"
 ],
 "out_g": 480,
-"id": "r-treska-zapechennaya-s-limonom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-treska-zapechennaya-s-limonom"
 },
 {
 "title": "Сёмга на пару",
@@ -1192,8 +1192,8 @@
 "Быстро"
 ],
 "out_g": 300,
-"id": "r-semga-na-paru",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-semga-na-paru"
 },
 {
 "title": "Минтай тушёный с морковью",
@@ -1244,8 +1244,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 950,
-"id": "r-mintay-tushenyy-s-morkovyu",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-mintay-tushenyy-s-morkovyu"
 },
 {
 "title": "Куриная грудка запечённая",
@@ -1290,8 +1290,8 @@
 "needs_sauce": 1,
 "tags": [],
 "out_g": 450,
-"id": "r-kurinaya-grudka-zapechennaya",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-kurinaya-grudka-zapechennaya"
 },
 {
 "title": "Котлеты из индейки на пару",
@@ -1336,8 +1336,8 @@
 "needs_sauce": 1,
 "tags": [],
 "out_g": 650,
-"id": "r-kotlety-iz-indeyki-na-paru",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-kotlety-iz-indeyki-na-paru"
 },
 {
 "title": "Тефтели в томатном соусе",
@@ -1388,8 +1388,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 1100,
-"id": "r-tefteli-v-tomatnom-souse",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-tefteli-v-tomatnom-souse"
 },
 {
 "title": "Говядина тушёная с овощами",
@@ -1452,8 +1452,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 1000,
-"id": "r-govyadina-tushenaya-s-ovoschami",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-govyadina-tushenaya-s-ovoschami"
 },
 {
 "title": "Куриная печень со сметаной",
@@ -1500,8 +1500,8 @@
 "Быстро"
 ],
 "out_g": 600,
-"id": "r-kurinaya-pechen-so-smetanoy",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-kurinaya-pechen-so-smetanoy"
 },
 {
 "title": "Овощное рагу",
@@ -1564,8 +1564,8 @@
 "needs_sauce": 1,
 "tags": [],
 "out_g": 1300,
-"id": "r-ovoschnoe-ragu",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-ovoschnoe-ragu"
 },
 {
 "title": "Макароны с тунцом",
@@ -1618,8 +1618,8 @@
 "Быстро"
 ],
 "out_g": 900,
-"id": "r-makarony-s-tuntsom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-makarony-s-tuntsom"
 },
 {
 "title": "Фасоль по-грузински (лобио)",
@@ -1670,8 +1670,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 900,
-"id": "r-fasol-po-gruzinski-lobio",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-fasol-po-gruzinski-lobio"
 },
 {
 "title": "Тушёная капуста с грибами",
@@ -1722,8 +1722,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 1200,
-"id": "r-tushenaya-kapusta-s-gribami",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-tushenaya-kapusta-s-gribami"
 },
 {
 "title": "Креветки с чесноком",
@@ -1770,8 +1770,8 @@
 "Быстро"
 ],
 "out_g": 380,
-"id": "r-krevetki-s-chesnokom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-krevetki-s-chesnokom"
 },
 {
 "title": "Гречка отварная",
@@ -1804,8 +1804,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 600,
-"id": "r-grechka-otvarnaya",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-grechka-otvarnaya"
 },
 {
 "title": "Рис отварной",
@@ -1838,8 +1838,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 560,
-"id": "r-ris-otvarnoy",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-ris-otvarnoy"
 },
 {
 "title": "Булгур",
@@ -1872,8 +1872,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 520,
-"id": "r-bulgur",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-bulgur"
 },
 {
 "title": "Картофельное пюре",
@@ -1912,8 +1912,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 950,
-"id": "r-kartofelnoe-pyure",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-kartofelnoe-pyure"
 },
 {
 "title": "Стручковая фасоль с чесноком",
@@ -1954,8 +1954,8 @@
 "Быстро"
 ],
 "out_g": 400,
-"id": "r-struchkovaya-fasol-s-chesnokom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-struchkovaya-fasol-s-chesnokom"
 },
 {
 "title": "Брокколи на пару",
@@ -1984,8 +1984,8 @@
 "Быстро"
 ],
 "out_g": 380,
-"id": "r-brokkoli-na-paru",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-brokkoli-na-paru"
 },
 {
 "title": "Запечённые овощи",
@@ -2036,8 +2036,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 650,
-"id": "r-zapechennye-ovoschi",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-zapechennye-ovoschi"
 },
 {
 "title": "Картофель запечённый",
@@ -2076,8 +2076,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 650,
-"id": "r-kartofel-zapechennyy",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-kartofel-zapechennyy"
 },
 {
 "title": "Макароны отварные",
@@ -2110,8 +2110,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 575,
-"id": "r-makarony-otvarnye",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-makarony-otvarnye"
 },
 {
 "title": "Грибная подлива",
@@ -2162,8 +2162,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 700,
-"id": "r-gribnaya-podliva",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-gribnaya-podliva"
 },
 {
 "title": "Постная грибная подлива",
@@ -2214,8 +2214,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 700,
-"id": "r-postnaya-gribnaya-podliva",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-postnaya-gribnaya-podliva"
 },
 {
 "title": "Томатный соус",
@@ -2260,8 +2260,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 420,
-"id": "r-tomatnyy-sous",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-tomatnyy-sous"
 },
 {
 "title": "Сметанно-чесночный соус",
@@ -2300,8 +2300,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 210,
-"id": "r-smetanno-chesnochnyy-sous",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-smetanno-chesnochnyy-sous"
 },
 {
 "title": "Йогуртовый соус с огурцом",
@@ -2340,8 +2340,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 300,
-"id": "r-yogurtovyy-sous-s-ogurtsom",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-yogurtovyy-sous-s-ogurtsom"
 },
 {
 "title": "Лимонно-горчичная заправка",
@@ -2380,8 +2380,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 90,
-"id": "r-limonno-gorchichnaya-zapravka",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-limonno-gorchichnaya-zapravka"
 },
 {
 "title": "Салат из свежих овощей",
@@ -2428,8 +2428,8 @@
 "Быстро"
 ],
 "out_g": 650,
-"id": "r-salat-iz-svezhih-ovoschey",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-salat-iz-svezhih-ovoschey"
 },
 {
 "title": "Винегрет",
@@ -2480,8 +2480,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": 1300,
-"id": "r-vinegret",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-vinegret"
 },
 {
 "title": "Салат с тунцом и фасолью",
@@ -2528,8 +2528,8 @@
 "Быстро"
 ],
 "out_g": 600,
-"id": "r-salat-s-tuntsom-i-fasolyu",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-salat-s-tuntsom-i-fasolyu"
 },
 {
 "title": "Хумус с овощами",
@@ -2562,8 +2562,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": null,
-"id": "r-humus-s-ovoschami",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-humus-s-ovoschami"
 },
 {
 "title": "Кефир с отрубями и ягодами",
@@ -2590,8 +2590,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": null,
-"id": "r-kefir-s-otrubyami-i-yagodami",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-kefir-s-otrubyami-i-yagodami"
 },
 {
 "title": "Яблоко с орехами",
@@ -2618,8 +2618,8 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": null,
-"id": "r-yabloko-s-orehami",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-yabloko-s-orehami"
 },
 {
 "title": "Творог с зеленью",
@@ -2652,7 +2652,7 @@
 "needs_sauce": 0,
 "tags": [],
 "out_g": null,
-"id": "r-tvorog-s-zelenyu",
-"updated": 1795788000000
+"updated": 1795788000000,
+"id": "r-tvorog-s-zelenyu"
 }
 ]

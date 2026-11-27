@@ -1,5 +1,6 @@
 # Starter recipes. Run: python3 recipes_src.py -> ../data/recipes.json
-import json, csv
+import json, csv, os
+HERE = os.path.dirname(os.path.abspath(__file__))
 R = []
 BASE = 1795788000000  # catalog time of the first release; a new or changed recipe gets updated=<now in ms> so devices take it
 def r(title, role, meals, serv, time, items, steps, side=0, sauce=0, tags=(), out=None, updated=BASE):
@@ -68,7 +69,7 @@ r('Яблоко с орехами','snack','s',1,1,[('Яблоко',1,'шт'),('
 r('Творог с зеленью','snack','s',1,5,[('Творог 5%',150,'г'),('Укроп',0.2,'пучок'),('Огурец',0.5,'шт')],'Творог смешать с рубленой зеленью и огурцом.')
 
 prods = {}
-for row in csv.DictReader(open('../data/products.tsv', encoding='utf-8'), delimiter='\t'):
+for row in csv.DictReader(open(os.path.join(HERE, '../data/products.tsv'), encoding='utf-8'), delimiter='\t'):
     prods[row['name'].lower()] = row['id']
 UNITS = {'г','мл','шт','ст.л.','ч.л.','щепотка','банка','пучок','зубчик','головка','кусок','кг','л'}
 out = []
@@ -83,5 +84,5 @@ for x in R:
         items.append([prods[n.lower()], n, q, u])
     out.append({**x, 'id': rid, 'items': items})
 assert len({o['id'] for o in out}) == len(out)
-json.dump(out, open('../data/recipes.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
+json.dump(out, open(os.path.join(HERE, '../data/recipes.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
 print(len(out))

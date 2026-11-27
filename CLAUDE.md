@@ -20,6 +20,7 @@ Max пишет по-русски, отвечать по-русски, прост
 - Поднять версию в `js/app.js` (VERSION), `sw.js` (CACHE), `desktop/package.json`.
 - `cd desktop && npm install && npm run build` → `desktop/dist` (Mac arm64 и Windows portable).
 - Установщики кладутся в ~/Desktop/SuperFood у Max. Файлы больше 25 МБ передавать кусками по 20 МБ, склеивать `cat`, сверять md5.
+- После каждого выпуска сразу переустановить и перезапустить SuperFood на MacBook Max через Remote Control: `bash ~/Desktop/SuperFood/"Установить SuperFood.command"` (Max ничего не нажимает).
 - Телефон: GitHub Pages из main (Max включает сам в Settings → Pages).
 
 ## Безопасность (правило Max, всегда)

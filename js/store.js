@@ -50,6 +50,17 @@ CREATE INDEX IF NOT EXISTS idx_rt_recipe ON recipe_tags(recipe_id);
 CREATE INDEX IF NOT EXISTS idx_plan_date ON plan(date);
 `;
 
+  // columns added after the first release: older databases (and older synced copies) get them here
+  const EXTRA_COLS = [['products', 'photo', 'TEXT'], ['products', 'photo_url', 'TEXT'], ['recipes', 'days', 'INTEGER'], ['plan', 'leftover', 'INTEGER DEFAULT 0']];
+  function addCols(db) {
+    for (const [t, c, type] of EXTRA_COLS) {
+      const st = db.prepare(`PRAGMA table_info(${t})`); let has = false;
+      while (st.step()) if (st.getAsObject().name === c) has = true;
+      st.free();
+      if (!has) db.run(`ALTER TABLE ${t} ADD COLUMN ${c} ${type}`);
+    }
+  }
+
   // ---------- IndexedDB key/value ----------
   const IDB = {
     db: null,
@@ -105,7 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_plan_date ON plan(date);
       s.persist = true;
       const bytes = await IDB.get('kv', 'db');
       s.db = bytes ? new S.Database(bytes) : new S.Database();
-      s.db.run(SCHEMA);
+      s.db.run(SCHEMA); addCols(s.db);
       s.migrate();
       await s.saveNow();
       return s;
@@ -114,10 +125,10 @@ CREATE INDEX IF NOT EXISTS idx_plan_date ON plan(date);
       const S = await sql();
       const s = new Store();
       s.db = new S.Database(buf);
-      s.db.run(SCHEMA);
+      s.db.run(SCHEMA); addCols(s.db);
       return s;
     }
-    static async memory() { const S = await sql(); const s = new Store(); s.db = new S.Database(); s.db.run(SCHEMA); s.migrate(); return s; }
+    static async memory() { const S = await sql(); const s = new Store(); s.db = new S.Database(); s.db.run(SCHEMA); addCols(s.db); s.migrate(); return s; }
 
     migrate() {
       if (!this.meta('device')) this.meta('device', uid());
@@ -227,8 +238,24 @@ CREATE INDEX IF NOT EXISTS idx_plan_date ON plan(date);
       this.changed();
     }
 
+    // one-time clean start (Max, 27.11.2026): remove every recipe and the menu made of them that existed before `before`.
+    // Recipes made later (on any device) are newer than `before` and stay.
+    wipeRecipes(before) {
+      return this.batch(() => {
+        const t = now();
+        const ids = this.all('SELECT id FROM recipes WHERE deleted = 0 AND updated_at < ?', [before]).map((r) => r.id);
+        for (const id of ids) {
+          this.db.run('UPDATE recipes SET deleted = 1, updated_at = ? WHERE id = ?', [t, id]);
+          this.db.run('UPDATE recipe_items SET deleted = 1, updated_at = ? WHERE recipe_id = ? AND deleted = 0', [t, id]);
+          this.db.run('UPDATE recipe_tags SET deleted = 1, updated_at = ? WHERE recipe_id = ? AND deleted = 0', [t, id]);
+          this.db.run('UPDATE plan SET deleted = 1, updated_at = ? WHERE recipe_id = ? AND deleted = 0', [t, id]);
+        }
+        this.changed();
+        return ids.length;
+      });
+    }
     referencedHashes() {
-      return new Set(this.all('SELECT DISTINCT photo FROM recipes WHERE deleted = 0 AND photo IS NOT NULL AND photo <> \'\'').map((r) => r.photo));
+      return new Set(this.all('SELECT DISTINCT photo FROM recipes WHERE deleted = 0 AND photo IS NOT NULL AND photo <> \'\' UNION SELECT DISTINCT photo FROM products WHERE deleted = 0 AND photo IS NOT NULL AND photo <> \'\'').map((r) => r.photo));
     }
 
     // Starter catalog (data/products.tsv, data/recipes.json). Catalog rows carry their own updated_at, so they

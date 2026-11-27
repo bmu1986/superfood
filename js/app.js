@@ -3,7 +3,7 @@
 (function () {
   const { Store, Blobs, IDB, uid, Dropbox, startAuth, finishAuth, sync, photoBytes, Pending } = window.SF;
   const F = window.Food;
-  const VERSION = '0.2.1';
+  const VERSION = '0.3.0';
 
   // ---------- DOM helpers ----------
   const $ = (s, r = document) => r.querySelector(s);
@@ -133,6 +133,13 @@
     if (r.photo) photoUrl(r.photo).then((u) => { if (u) { el.style.backgroundImage = `url("${u}")`; if (letter) el.textContent = ''; el.classList.remove('ph-art'); } });
     return el;
   }
+  // product picture: own photo (synced file), else a picture link from the catalog, else the first letter
+  function prodPic(el, p) {
+    el.classList.add('ph-art'); el.style.backgroundImage = 'linear-gradient(150deg,#9bc7a5,#3f7d55)'; el.textContent = (p.name || '?').charAt(0).toUpperCase();
+    const show = (u) => { if (u) { el.style.backgroundImage = `url("${u}")`; el.textContent = ''; el.classList.remove('ph-art'); } };
+    if (p.photo) photoUrl(p.photo).then(show); else if (p.photo_url) show(p.photo_url);
+    return el;
+  }
   async function resizeImage(file) {
     const bmp = await createImageBitmap(file);
     const k = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
@@ -149,13 +156,18 @@
   const kc = (n) => Math.round(n).toLocaleString('ru-RU');
   const cbEl = (on, onclick) => h('button', { class: 'cb' + (on ? ' on' : ''), 'aria-label': on ? 'Снять отметку' : 'Отметить', html: on ? I.check() : '', onclick });
   function filterChips(filters, names, onchange) {
-    return names.map((n) => h('button', { class: 'fchip ' + (filters[n] || ''), onclick: () => {
+    if (filters['Без изжоги'] === 'need') { delete filters['Без изжоги']; filters['Изжога'] = 'skip'; }
+    delete filters['Без изжоги'];
+    return names.map((n) => n === 'Изжога'
+      // heartburn: one switch «Без изжоги» (dishes with a red-marked product are left out)
+      ? h('button', { class: 'fchip' + (filters[n] === 'skip' ? ' need' : ''), onclick: () => { if (filters[n] === 'skip') delete filters[n]; else filters[n] = 'skip'; onchange(); } }, 'Без изжоги')
+      : h('button', { class: 'fchip ' + (filters[n] || ''), onclick: () => {
       const next = { undefined: 'need', need: 'skip', skip: undefined }[filters[n]];
       if (next) filters[n] = next; else delete filters[n];
       onchange();
     } }, n));
   }
-  const filterNames = () => [...F.AUTO, ...[...model.T.values()].map((t) => t.name).filter((n) => !F.AUTO.includes(n))];
+  const filterNames = () => [...F.AUTO, ...[...model.T.values()].map((t) => t.name).filter((n) => !F.AUTO.includes(n) && n !== 'Без изжоги')];
 
   // ---------- layout ----------
   const VIEWS = [['shop', 'Покупки', I.cart], ['menu', 'Меню', I.cal], ['recipes', 'Рецепты', I.book], ['more', 'Ещё', I.gear]];
@@ -341,6 +353,7 @@
     const wrap = h('div', { class: 'days' });
     for (const date of dates) {
       const dr = rows.filter((r) => r.date === date);
+      if (!dr.length && date < today) { const [w0, d0] = dayName(date); wrap.append(h('div', { class: 'day-past' }, `${w0}, ${d0} · прошёл`)); continue; }
       const stats = F.dayStats(model, dr, s.goal);
       const [wd, dm] = dayName(date);
       const card = h('div', { class: 'day' + (date === today ? ' today' : '') },
@@ -371,6 +384,11 @@
     if (left >= 100) opts.push(`${Math.round(Math.min(400, left / 0.4) / 50) * 50} мл кефира`);
     return `До цели ещё ${left} ккал: ${opts.slice(0, 2).join(' или ') || 'можно чай с чем-то лёгким'}.`;
   }
+  // the first day of a dish made for several days: the next day has the same dish marked «доедаем»
+  function isCookDay(date, slot, r) {
+    const d = new Date(F.fromIso(date)); d.setDate(d.getDate() + 1);
+    return !!store.get('SELECT id FROM plan WHERE deleted = 0 AND date = ? AND slot = ? AND part = \'main\' AND recipe_id = ? AND leftover = 1', [F.iso(d), slot, r.id]);
+  }
   function mealRow(date, slot, sr) {
     const main = sr.find((r) => r.part === 'main') || sr[0];
     const mi = F.partInfo(model, main);
@@ -380,23 +398,25 @@
     const thumb = h('div', { class: 'thumb' });
     if (mi && mi.r) paint(thumb, mi.r); else { thumb.style.background = 'linear-gradient(150deg,#a48ad8,#5a3d9a)'; thumb.textContent = (mi?.title || '?').charAt(0); }
     return h('div', { class: 'meal', onclick: () => mealSheet(date, slot) }, thumb,
-      h('div', { class: 'mt' }, h('div', { class: 'slot' }, F.SLOT_NAME[slot]), h('div', { class: 'nm' }, mi ? mi.title : '—'), extra.length ? h('div', { class: 'ex' }, '+ ' + extra.join(' · ')) : null),
+      h('div', { class: 'mt' }, h('div', { class: 'slot' }, F.SLOT_NAME[slot]), h('div', { class: 'nm' }, mi ? mi.title : '—', main.leftover ? h('span', { class: 'lo' }, 'доедаем') : mi && mi.r && (mi.r.days || 1) > 1 && isCookDay(date, slot, mi.r) ? h('span', { class: 'lo' }, `готовим на ${mi.r.days} ${plural(mi.r.days, 'день', 'дня', 'дней')}`) : null), extra.length ? h('div', { class: 'ex' }, '+ ' + extra.join(' · ')) : null),
       h('div', { class: 'gr' }, `${Math.round(main.grams || 0)} ${mi && mi.r && mi.r.role === 'soup' ? 'мл' : 'г'}`, h('small', {}, `${kc(kcal)} ккал`)),
       h('button', { class: 'mbtn' + (locked ? ' on' : ''), title: locked ? 'Закреплено' : 'Закрепить', 'aria-label': 'Закрепить', html: I.lock(), onclick: (e) => { e.stopPropagation(); store.batch(() => { for (const r of sr) store.upsert('plan', { id: r.id, locked: locked ? 0 : 1 }); }); render(); } }),
       h('button', { class: 'mbtn', title: 'Другое блюдо', 'aria-label': 'Другое блюдо', html: I.reroll(), onclick: (e) => { e.stopPropagation(); regenerate({ date, slot }); } }));
   }
   async function menuMenu() {
-    const v = await choose('Меню', [{ label: 'Подобрать заново (кроме закреплённых)', value: 'gen' }, { label: 'Список покупок на эту неделю', value: 'shop' }, { label: 'Очистить неделю', value: 'clear', danger: true }]);
-    if (v === 'gen') regenerate({});
+    const v = await choose('Меню', [{ label: 'Подобрать заново с сегодняшнего дня (кроме закреплённых)', value: 'gen' }, { label: 'Список покупок на эту неделю', value: 'shop' }, { label: 'Очистить неделю', value: 'clear', danger: true }]);
+    if (v === 'gen') { const wd = weekDates(), t = F.iso(new Date()); regenerate({ from: wd.includes(t) ? t : wd[0] }); }
     if (v === 'shop') shopFromWeek();
     if (v === 'clear' && await confirmDlg('Очистить меню недели?', 'Очистить')) { const d = weekDates(); store.batch(() => { for (const r of store.all('SELECT id FROM plan WHERE deleted = 0 AND date >= ? AND date <= ?', [d[0], d[6]])) store.softDelete('plan', r.id); }); render(); }
   }
   // generate the whole week, one day or one meal; locked meals stay
   let genCount = 0;
-  function regenerate({ date, slot, emptyOnly } = {}) {
+  function regenerate({ date, slot, emptyOnly, from } = {}) {
     const s = S();
-    const dates = weekDates();
-    const existing = store.all('SELECT * FROM plan WHERE deleted = 0 AND date >= ? AND date <= ?', [dates[0], dates[6]]);
+    if (!model.R.size) { toast('Сначала добавь рецепты: меню собирается из них'); return; }
+    const dates = weekDates().filter((d) => !from || d >= from);
+    if (!dates.length) return;
+    const existing = store.all('SELECT * FROM plan WHERE deleted = 0 AND date >= ? AND date <= ?', [dates[0], dates[dates.length - 1]]);
     const prev = new Date(F.fromIso(dates[0])); prev.setDate(prev.getDate() - 7);
     const history = store.all('SELECT * FROM plan WHERE deleted = 0 AND date >= ? AND date < ?', [F.iso(prev), dates[0]]);
     const only = date ? { date, slot } : null;
@@ -414,7 +434,7 @@
       for (const r of plan) {
         if (r.locked) continue;
         const id = `${r.date}:${r.slot}:${r.part}`;
-        store.upsert('plan', { id, date: r.date, slot: r.slot, part: r.part, recipe_id: r.recipe_id || null, product_id: r.product_id || null, grams: r.grams, locked: 0, deleted: 0 }, t);
+        store.upsert('plan', { id, date: r.date, slot: r.slot, part: r.part, recipe_id: r.recipe_id || null, product_id: r.product_id || null, grams: r.grams, locked: 0, leftover: r.leftover ? 1 : 0, deleted: 0 }, t);
       }
       void touched;
     });
@@ -442,6 +462,12 @@
     const eat = h('div', { class: 'seg' });
     const drawEat = () => { eat.innerHTML = ''; eat.append(...[1, 2, 3, 4, 5, 6].map((n) => h('button', { class: eaters === n ? 'on' : '', onclick: () => { eaters = n; drawEat(); } }, n))); };
     drawEat();
+    const wd = weekDates();
+    const today = F.iso(new Date());
+    let from = wd.includes(today) ? today : wd[0];
+    const fromPills = h('div', { class: 'chips wrap' });
+    const drawFrom = () => { fromPills.innerHTML = ''; fromPills.append(...wd.map((d) => { const [w, dm] = dayName(d); return h('button', { class: 'fchip' + (d === from ? ' on' : '') + (d < today ? ' past' : ''), onclick: () => { from = d; drawFrom(); } }, `${w.slice(0, 2)} ${dm.split(' ')[0]}`); })); };
+    drawFrom();
     const save = () => {
       store.setSetting('filters', filters);
       store.setSetting('slots', F.SLOTS.map(([k]) => k).filter((k) => slots.has(k)));
@@ -449,12 +475,13 @@
       store.setSetting('eaters', eaters);
     };
     const sh = sheet('Подобрать меню', h('div', { class: 'form' },
+      h('div', { class: 'lbl' }, 'С какого дня планировать (дни до него не трогаются)'), fromPills,
       h('div', { class: 'lbl' }, 'Ограничения: нажми раз, чтобы «нужно», два, чтобы «исключить»'), chips,
       h('div', { class: 'lbl' }, 'Приёмы пищи'), slotPills,
       h('div', { class: 'row2' }, h('div', {}, h('div', { class: 'lbl', style: { marginBottom: '6px' } }, 'Цель, ккал в день'), goal), h('div', {}, h('div', { class: 'lbl', style: { marginBottom: '6px' } }, 'Сколько едоков (для покупок)'), eat)),
-      h('p', { class: 'hint' }, 'Закреплённые блюда останутся. Гарниры и соусы подбираются к блюдам, где они нужны, порции считаются под цель.'),
-      h('button', { class: 'btn primary', onclick: () => { save(); sh.close(); rebuildModel(); regenerate({}); } }, 'Подобрать на неделю'),
-      h('button', { class: 'btn', onclick: () => { save(); sh.close(); regenerate({ emptyOnly: true }); } }, 'Заполнить только пустые дни')), { full: true });
+      h('p', { class: 'hint' }, 'Закреплённые блюда останутся. Блюда, которые готовят на несколько дней (например суп), встанут сразу на эти дни. Гарниры и соусы подбираются к блюдам, где они нужны, порции считаются под цель.'),
+      h('button', { class: 'btn primary', onclick: () => { save(); sh.close(); rebuildModel(); regenerate({ from }); } }, 'Подобрать меню'),
+      h('button', { class: 'btn', onclick: () => { save(); sh.close(); regenerate({ emptyOnly: true, from }); } }, 'Заполнить только пустые дни')), { full: true });
   }
   // one meal: parts with grams, swap, add side or sauce, lock
   function mealSheet(date, slot) {
@@ -506,7 +533,7 @@
     const listEl = h('div', { class: 'menu' });
     const pick = (o) => {
       const id = `${date}:${slot}:${part}`;
-      store.upsert('plan', { id, date, slot, part, recipe_id: o.recipe_id || null, product_id: o.product_id || null, grams: 0, locked: 1, deleted: 0 });
+      store.upsert('plan', { id, date, slot, part, recipe_id: o.recipe_id || null, product_id: o.product_id || null, grams: 0, locked: 1, leftover: 0, deleted: 0 });
       const rows = store.all('SELECT * FROM plan WHERE deleted = 0 AND date = ? AND slot = ?', [date, slot]);
       const split = s.split; const sum = s.slots.reduce((a, k) => a + (split[k] || 0), 0) || 1;
       const fresh = rows.map((r) => (r.part === part ? { ...r, locked: 0 } : r));
@@ -549,7 +576,7 @@
       const rs = [...model.R.values()].filter((r) => (!st.role || (st.role === 'fav' ? r.fav : r.role === st.role)) && F.passes(r.labels, st.rfilters)
         && (!t || F.norm(r.title).includes(t) || r.items.some((i) => F.norm(i.name).includes(t))))
         .sort((a, b) => (b.fav - a.fav) || a.title.localeCompare(b.title, 'ru'));
-      if (!rs.length) { grid.append(h('div', { class: 'empty', style: { gridColumn: '1 / -1' } }, 'Ничего не нашлось.')); return; }
+      if (!rs.length) { grid.append(h('div', { class: 'empty', style: { gridColumn: '1 / -1' } }, model.R.size ? 'Ничего не нашлось.' : 'Рецептов пока нет. Нажми «+», чтобы добавить первый.')); return; }
       for (const r of rs) {
         const lbl = r.labels.has('Пост') ? 'Пост' : r.labels.has('Рыба') ? 'Рыба' : r.labels.has('Птица') ? 'Птица' : r.labels.has('Мясо') ? 'Мясо' : null;
         grid.append(h('button', { class: 'rcard', onclick: () => openRecipe(r.id) }, paint(h('div', { class: 'ph' }), r),
@@ -584,7 +611,7 @@
     const labels = [...r.labels];
     const body = h('div', { class: 'rv-body' },
       h('div', { class: 'rv-title' }, r.title),
-      h('div', { class: 'rv-chips' }, h('span', { class: 'lchip' }, F.ROLE_NAME[r.role] || ''), labels.map((l) => h('span', { class: 'lchip ' + (l === 'Изжога' ? 'r' : ['Пост', 'Без изжоги', 'Быстро'].includes(l) ? 'g' : '') }, l === 'Изжога' ? 'Может вызвать изжогу' : l))),
+      h('div', { class: 'rv-chips' }, h('span', { class: 'lchip' }, F.ROLE_NAME[r.role] || ''), (r.days || 1) > 1 ? h('span', { class: 'lchip lo' }, `на ${r.days} ${plural(r.days, 'день', 'дня', 'дней')}`) : null, labels.map((l) => h('span', { class: 'lchip ' + (l === 'Изжога' ? 'r' : ['Пост', 'Быстро'].includes(l) ? 'g' : '') }, l === 'Изжога' ? 'Может вызвать изжогу' : l))),
       h('div', { class: 'stats' },
         h('div', { class: 'stat' }, h('b', {}, kc(per)), h('small', {}, 'ккал/порц.')),
         h('div', { class: 'stat' }, h('b', {}, kc(r.nut.kpg * 100)), h('small', {}, 'ккал/100 г')),
@@ -615,7 +642,7 @@
     if (!slot) return;
     const part = r.role === 'side' ? 'side' : r.role === 'sauce' ? 'sauce' : 'main';
     const s = S(); const sum = s.slots.reduce((a, k) => a + (s.split[k] || 0), 0) || 1;
-    store.upsert('plan', { id: `${d}:${slot}:${part}`, date: d, slot, part, recipe_id: r.id, product_id: null, grams: 0, locked: 1, deleted: 0 });
+    store.upsert('plan', { id: `${d}:${slot}:${part}`, date: d, slot, part, recipe_id: r.id, product_id: null, grams: 0, locked: 1, leftover: 0, deleted: 0 });
     const rows = store.all('SELECT * FROM plan WHERE deleted = 0 AND date = ? AND slot = ?', [d, slot]).map((x) => (x.part === part ? { ...x, locked: 0 } : x));
     F.portion(model, rows, s.goal * (s.split[slot] || 25) / sum, rows.filter((x) => x.locked));
     store.batch(() => { for (const x of rows) store.upsert('plan', { id: x.id, grams: x.grams }); });
@@ -635,9 +662,10 @@
     const mealPills = h('div', { class: 'chips wrap' });
     const drawMeals = () => { mealPills.innerHTML = ''; mealPills.append(...F.SLOTS.map(([k, n]) => h('button', { class: 'fchip' + (meals.has(k) ? ' on' : ''), onclick: () => { meals.has(k) ? meals.delete(k) : meals.add(k); drawMeals(); } }, n))); };
     drawMeals();
-    role.onchange = () => { const def = { breakfast: 'b', soup: 'l', main: 'ld', side: 'ld', sauce: 'ld', salad: 'ld', snack: 's', dessert: 's' }[role.value]; meals.clear(); for (const c of def) meals.add(c); drawMeals(); };
+    role.onchange = () => { if (role.value === 'soup' && Number(days.value) <= 1) days.value = 3; const def = { breakfast: 'b', soup: 'l', main: 'ld', side: 'ld', sauce: 'ld', salad: 'ld', snack: 's', dessert: 's' }[role.value]; meals.clear(); for (const c of def) meals.add(c); drawMeals(); };
     const servings = h('input', { class: 'field', type: 'number', inputmode: 'numeric', value: r.servings, min: 1 });
     const time = h('input', { class: 'field', type: 'number', inputmode: 'numeric', value: r.time || '', placeholder: 'мин' });
+    const days = h('input', { class: 'field', type: 'number', inputmode: 'numeric', value: r.days || 1, min: 1, max: 7 });
     const ingText = r.items.map((i) => `${i.name}${i.qty != null ? ' ' + F.fmtQty(i.qty, i.unit) : ''}`).join('\n');
     const ing = h('textarea', { class: 'field', rows: 7, placeholder: 'По одному на строку:\nрис 500 г\nморковь 3 шт\nлук 2\nсоль по вкусу' });
     ing.value = prefill?.ingredients ?? ingText;
@@ -673,7 +701,7 @@
     const needSide = sw(r.needs_side), needSauce = sw(r.needs_sauce);
     const save = () => {
       if (!title.value.trim()) { title.focus(); toast('Напиши название'); return; }
-      const id = store.saveRecipe({ id: r.id, title: title.value.trim(), role: role.value, meals: [...meals].join(''), servings: Number(servings.value) || 2, time: Number(time.value) || 0,
+      const id = store.saveRecipe({ id: r.id, title: title.value.trim(), role: role.value, meals: [...meals].join(''), servings: Number(servings.value) || 2, time: Number(time.value) || 0, days: Math.max(1, Math.min(7, Number(days.value) || 1)),
         steps: steps.value.trim(), source: source.value.trim(), photo, needs_side: needSide.classList.contains('on') ? 1 : 0, needs_sauce: needSauce.classList.contains('on') ? 1 : 0, out_g: r.out_g ?? null, fav: r.fav || 0 }, items, [...tagSet]);
       sh.close();
       openRecipe(id);
@@ -682,6 +710,7 @@
       pick, title,
       h('div', { class: 'row2' }, h('div', {}, h('div', { class: 'lbl', style: { marginBottom: '6px' } }, 'Что это'), role), h('div', { class: 'row2' }, h('div', {}, h('div', { class: 'lbl', style: { marginBottom: '6px' } }, 'Порций'), servings), h('div', {}, h('div', { class: 'lbl', style: { marginBottom: '6px' } }, 'Минут'), time))),
       h('div', { class: 'lbl' }, 'Когда есть'), mealPills,
+      h('div', { class: 'row2' }, h('div', {}, h('div', { class: 'lbl', style: { marginBottom: '6px' } }, 'Хватает на дней'), days), h('p', { class: 'hint', style: { margin: 0, alignSelf: 'end' } }, 'Суп или большое блюдо на 2–3 дня: в меню встанет на эти дни подряд, в покупки один раз.')),
       h('div', { class: 'lbl' }, 'Ингредиенты'), ing, parsed,
       h('div', { class: 'lbl' }, 'Приготовление'), steps,
       h('div', { class: 'sg-card', style: { margin: 0 } }, h('div', { class: 'srow' }, h('span', {}, 'Подавать с гарниром'), needSide), h('div', { class: 'srow' }, h('span', {}, 'Нужен соус или подлива'), needSauce)),
@@ -784,7 +813,7 @@
       const order = deptList().map((d) => d[0]);
       for (const p of [...ps].sort((a, b) => order.indexOf(deptOf(a.dept)) - order.indexOf(deptOf(b.dept)) || a.name.localeCompare(b.name, 'ru'))) {
         if (deptOf(p.dept) !== lastDept) { lastDept = deptOf(p.dept); box.append(h('div', { class: 'dept' }, deptName(lastDept))); }
-        box.append(h('div', { class: 'prod', onclick: () => editProduct(p) }, h('span', {}, p.name, h('small', {}, `Б ${F.fmtNum(p.protein)} · Ж ${F.fmtNum(p.fat)} · У ${F.fmtNum(p.carbs)}${String(p.flags).includes('g') ? ' · гарнир' : ''}${String(p.flags).includes('s') ? ' · соус' : ''}`)), h('b', {}, `${kc(p.kcal)} ккал`)));
+        box.append(h('div', { class: 'prod', onclick: () => editProduct(p) }, prodPic(h('div', { class: 'thumb' }), p), h('span', {}, p.name, String(p.flags).includes('h') ? h('i', { class: 'hb-dot', title: 'Изжога' }) : null, h('small', {}, `Б ${F.fmtNum(p.protein)} · Ж ${F.fmtNum(p.fat)} · У ${F.fmtNum(p.carbs)}${String(p.flags).includes('g') ? ' · гарнир' : ''}${String(p.flags).includes('s') ? ' · соус' : ''}`)), h('b', {}, `${kc(p.kcal)} ккал`)));
       }
     };
     q.oninput = draw; draw();
@@ -800,20 +829,25 @@
     const diet = h('select', { class: 'field' }, [['v', 'Постное (растительное)'], ['f', 'Рыба и морепродукты'], ['c', 'Птица'], ['m', 'Мясо'], ['d', 'Молочное'], ['e', 'Яйца']].map(([k, n]) => h('option', { value: k, selected: p.diet === k ? true : null }, n)));
     const flags = new Set(String(p.flags));
     const fl = h('div', { class: 'chips wrap' });
-    const drawFl = () => { fl.innerHTML = ''; fl.append(...[['g', 'Гарнир'], ['s', 'Соус'], ['n', 'Перекус'], ['b', 'Обычно есть дома'], ['h', 'Может вызвать изжогу']].map(([k, n]) => h('button', { class: 'fchip' + (flags.has(k) ? ' on' : ''), onclick: () => { flags.has(k) ? flags.delete(k) : flags.add(k); drawFl(); } }, n))); };
+    let photo = p.photo || null, photoUrlCat = p.photo_url || null;
+    const pick = h('button', { class: 'pick', type: 'button' }, h('span', {}, photo || photoUrlCat ? 'Сменить картинку' : 'Найти картинку'));
+    const setPick = () => { if (photo) photoUrl(photo).then((u) => { if (u) pick.style.backgroundImage = `url("${u}")`; }); else if (photoUrlCat) pick.style.backgroundImage = `url("${photoUrlCat}")`; };
+    setPick();
+    pick.onclick = async () => { const hash = await choosePhoto(name.value.trim(), 'Картинка продукта'); if (hash) { photo = hash; photoUrlCat = null; setPick(); pick.firstChild.textContent = 'Сменить картинку'; } };
+    const drawFl = () => { fl.innerHTML = ''; fl.append(...[['h', 'Изжога'], ['g', 'Гарнир'], ['s', 'Соус'], ['n', 'Перекус'], ['b', 'Обычно есть дома']].map(([k, n]) => h('button', { class: 'fchip' + (flags.has(k) ? (k === 'h' ? ' hb' : ' on') : ''), onclick: () => { flags.has(k) ? flags.delete(k) : flags.add(k); drawFl(); } }, n))); };
     drawFl();
     const quality = h('select', { class: 'field' }, [[2, 'Очень полезно'], [1, 'Полезно'], [0, 'Нейтрально'], [-1, 'Лучше пореже'], [-2, 'Вредно']].map(([k, n]) => h('option', { value: k, selected: Number(p.quality) === k ? true : null }, n)));
     const n = (el) => Number(String(el.value).replace(',', '.')) || 0;
     const save = () => {
       if (!name.value.trim()) return;
-      store.upsert('products', { id: p.id || 'u-' + uid(), name: name.value.trim(), aliases: aliases.value.trim(), dept: dept.value, kcal: n(kcal), protein: n(pr), fat: n(fa), carbs: n(ca), piece_g: n(piece), yield: n(yl) || 1, diet: diet.value, flags: [...flags].join(''), quality: Number(quality.value), deleted: 0 });
+      store.upsert('products', { id: p.id || 'u-' + uid(), name: name.value.trim(), aliases: aliases.value.trim(), dept: dept.value, kcal: n(kcal), protein: n(pr), fat: n(fa), carbs: n(ca), piece_g: n(piece), yield: n(yl) || 1, diet: diet.value, flags: [...flags].join(''), quality: Number(quality.value), photo, photo_url: photoUrlCat, deleted: 0 });
       sh.close(); render();
     };
     const L = (t) => h('div', { class: 'lbl' }, t);
-    const sh = sheet(isNew ? 'Новый продукт' : p.name, h('div', { class: 'form' }, name, aliases,
+    const sh = sheet(isNew ? 'Новый продукт' : p.name, h('div', { class: 'form' }, pick, name, aliases,
       L('На 100 г: ккал, белки, жиры, углеводы'), h('div', { class: 'row2' }, kcal, pr), h('div', { class: 'row2' }, fa, ca),
       L('Вес 1 шт (г) и выход после варки (гречка 2,5; мясо 0,7)'), h('div', { class: 'row2' }, piece, yl),
-      L('Отдел магазина'), dept, L('Тип для поста'), diet, L('Пометки'), fl, L('Полезность'), quality,
+      L('Отдел магазина'), dept, L('Тип для поста'), diet, L('Пометки (красная «Изжога» — блюда с этим продуктом помечаются изжогой)'), fl, L('Полезность'), quality,
       h('button', { class: 'btn primary', onclick: save }, 'Сохранить'),
       !isNew ? h('button', { class: 'btn', style: { color: 'var(--red)' }, onclick: async () => { if (await confirmDlg(`Удалить «${p.name}»?`)) { store.softDelete('products', p.id); sh.close(); render(); } } }, 'Удалить') : null), { full: true });
   }
@@ -1011,7 +1045,7 @@
     return en;
   }
   // pick a photo for a recipe: resolves with the saved photo hash (or undefined)
-  function choosePhoto(query) {
+  function choosePhoto(query, title = 'Фото блюда') {
     return new Promise((resolve) => {
       let done = false;
       const finish = (hash) => { done = true; s.close(); resolve(hash); };
@@ -1034,7 +1068,7 @@
           grid.append(cell);
           count++;
         }
-        status.textContent = count ? `Нашлось ${count} фото из разных мест. Нажми на любое: оно обрежется под карточку, кадр можно подвинуть.` : 'Ищу фото…';
+        status.textContent = count ? `Нашлось ${count}. Нажми на подходящее, оно обрежется под карточку. Нет нужного? Поправь запрос сверху, например «борщ с пампушками», и нажми «Найти».` : 'Ищу фото…';
       };
       const run = async (next) => {
         const my = next ? seq : ++seq;
@@ -1053,7 +1087,7 @@
       };
       more.onclick = () => { page++; run(true); };
       q.onkeydown = (e) => { if (e.key === 'Enter') run(); };
-      const s = sheet('Фото блюда', h('div', {},
+      const s = sheet(title, h('div', {},
         h('div', { class: 'quick' }, q, h('button', { class: 'btn primary', onclick: () => run() }, 'Найти')),
         h('div', { class: 'quick' }, h('button', { class: 'btn', style: { flex: 1 }, onclick: () => file.click() }, 'Своё фото с телефона или компьютера'), file),
         status, grid, more), { full: true, onClose: () => { seq++; if (!done) resolve(undefined); } });
@@ -1129,7 +1163,16 @@
   async function loadCatalog(manual = false) {
     try {
       const [tsv, json] = await Promise.all([fetch('data/products.tsv', { cache: 'no-cache' }).then((r) => r.text()), fetch('data/recipes.json', { cache: 'no-cache' }).then((r) => r.text())]);
-      const sig = 'v2:' + strHash(tsv) + ':' + strHash(json);
+      // clean start of recipes, asked by Max on 27.11.2026: a copy of the database is kept in IndexedDB first
+      if (!store.meta('wipe_recipes_1')) {
+        const WIPE_BEFORE = 1795802900000;
+        if (store.get('SELECT COUNT(*) AS n FROM recipes WHERE deleted = 0 AND updated_at < ?', [WIPE_BEFORE]).n) {
+          await IDB.set('kv', 'backup-before-recipe-wipe', store.db.export());
+          store.wipeRecipes(WIPE_BEFORE);
+        }
+        store.meta('wipe_recipes_1', Date.now());
+      }
+      const sig = 'v3:' + strHash(tsv) + ':' + strHash(json);
       if (!manual && store.meta('catalog_sig') === sig) return;
       const n = store.applyCatalog(Catalog.parseProducts(tsv), Catalog.parseRecipes(JSON.parse(json)), Catalog.tagRows(1795788000000), Catalog.deptRows(1795788000000));
       store.meta('catalog_sig', sig);

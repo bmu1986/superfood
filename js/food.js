@@ -155,16 +155,16 @@
     return { kcal, p, f, c, raw, weight, kpg: weight ? kcal / weight : 0 };
   }
 
-  const AUTO = ['Пост', 'Пост с рыбой', 'Вегетарианское', 'Рыба', 'Птица', 'Мясо', 'Без изжоги'];
-  const STRICT = new Set(['Пост', 'Пост с рыбой', 'Вегетарианское', 'Без изжоги']);
+  const AUTO = ['Пост', 'Пост с рыбой', 'Вегетарианское', 'Рыба', 'Птица', 'Мясо', 'Изжога'];
+  const STRICT = new Set(['Пост', 'Пост с рыбой', 'Вегетарианское']);
   function labelsFor(rec, T) {
     const diets = new Set();
-    let hb = 0, total = 0;
+    let hb = false;
     for (const i of rec.items) {
       if (!i.p) continue;
       diets.add(i.p.diet);
-      total += i.g;
-      if (String(i.p.flags).includes('h')) hb += i.g * (/чеснок|перец чили|уксус|аджика|хрен|горчиц/i.test(i.p.name) ? 3 : 1);
+      // heartburn is a plain mark: one marked product makes the whole dish «Изжога»
+      if (String(i.p.flags).includes('h')) hb = true;
     }
     const out = new Set();
     const animal = ['m', 'c', 'f', 'd', 'e'].some((d) => diets.has(d));
@@ -175,10 +175,8 @@
     if (diets.has('c')) out.add('Птица');
     if (diets.has('m')) out.add('Мясо');
     const manual = rec.tagIds.map((id) => T.get(id)).filter(Boolean).map((t) => t.name);
-    const hbRisk = total ? hb / total > 0.08 : false;
-    if (manual.includes('Без изжоги') || (!hbRisk && !manual.includes('Изжога'))) out.add('Без изжоги');
-    for (const m of manual) if (m !== 'Изжога') out.add(m);
-    if (!out.has('Без изжоги')) out.add('Изжога');
+    for (const m of manual) if (m !== 'Без изжоги') out.add(m);
+    if (hb) out.add('Изжога');
     return out;
   }
   function productLabels(p) {
@@ -188,7 +186,7 @@
     if (p.diet === 'd' || p.diet === 'e') out.add('Вегетарианское');
     if (p.diet === 'c') out.add('Птица');
     if (p.diet === 'm') out.add('Мясо');
-    out.add(String(p.flags).includes('h') ? 'Изжога' : 'Без изжоги');
+    if (String(p.flags).includes('h')) out.add('Изжога');
     return out;
   }
 
@@ -257,7 +255,8 @@
   function rng(seed) { let s = (seed % 2147483646) + 1; return () => (s = s * 16807 % 2147483647) / 2147483647; }
   const dietOf = (r) => (r.labels.has('Рыба') ? 'f' : r.labels.has('Мясо') ? 'm' : r.labels.has('Птица') ? 'c' : 'v');
   function passes(labels, filters, strictOnly) {
-    for (const [name, mode] of Object.entries(filters || {})) {
+    for (let [name, mode] of Object.entries(filters || {})) {
+      if (name === 'Без изжоги') { if (mode !== 'need') continue; name = 'Изжога'; mode = 'skip'; } // filters saved by 0.1–0.2
       if (strictOnly && mode === 'need' && !STRICT.has(name)) continue;
       if (mode === 'need' && !labels.has(name)) return false;
       if (mode === 'skip' && labels.has(name)) return false;
@@ -289,14 +288,35 @@
     const keep = new Map((opts.keep || []).map((k) => [`${k.date}:${k.slot}:${k.part}`, k]));
     const out = [];
     let lastSide = null;
+    // dishes cooked for several days (recipe.days): slot -> { left, parts } to repeat as «доедаем»
+    const carry = new Map();
+    const first = opts.dates[0];
+    for (const hr of [...(opts.history || [])].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+      if (hr.part !== 'main' || !hr.recipe_id || hr.leftover || hr.date >= first) continue;
+      const r = model.R.get(hr.recipe_id);
+      const gap = Math.round((Date.parse(first) - Date.parse(hr.date)) / 864e5);
+      if (r && (r.days || 1) > gap) carry.set(hr.slot, { left: (r.days || 1) - gap, parts: opts.history.filter((x) => x.date === hr.date && x.slot === hr.slot && !x.leftover).map((x) => ({ part: x.part, recipe_id: x.recipe_id, product_id: x.product_id })) });
+      else if (carry.has(hr.slot)) carry.delete(hr.slot);
+    }
     opts.dates.forEach((date, di) => {
       let prevDiet = null;
       for (const slot of slots) {
         if (opts.only && (opts.only.date !== date || (opts.only.slot && opts.only.slot !== slot))) continue;
         const key = (part) => `${date}:${slot}:${part}`;
         const kept = ['main', 'side', 'sauce'].map((p) => keep.get(key(p))).filter(Boolean);
-        if (kept.find((k) => k.part === 'main')) { out.push(...kept); continue; }
+        if (kept.find((k) => k.part === 'main')) { out.push(...kept); carry.delete(slot); continue; }
         const B = budget(slot);
+        const c = !opts.only && carry.get(slot);
+        if (c) {
+          // the same dish again: cooked earlier for several days
+          const rows = c.parts.map((x) => ({ date, slot, part: x.part, recipe_id: x.recipe_id || null, product_id: x.product_id || null, leftover: 1 }));
+          portion(model, rows, B, []);
+          out.push(...rows.map((r) => ({ ...r, locked: 0 })));
+          const m = c.parts.find((x) => x.part === 'main');
+          if (m && m.recipe_id) { if (!used.has(m.recipe_id)) used.set(m.recipe_id, []); used.get(m.recipe_id).push(di); }
+          if (--c.left <= 0) carry.delete(slot);
+          continue;
+        }
         // main
         const roles = SLOT_ROLES[slot];
         let cands = recipes.filter((r) => roles.includes(r.role) && String(r.meals || '').includes(slot) && passes(r.labels, opts.filters) && r.nut.kcal > 0);
@@ -339,6 +359,7 @@
         } else rows.push({ date, slot, part: 'main', recipe_id: null, product_id: mainProduct.id });
         portion(model, rows, B, kept);
         out.push(...rows.map((r) => ({ ...r, locked: kept.find((k) => k.part === r.part) ? 1 : 0, grams: r.grams })));
+        if (main && (main.days || 1) > 1 && !opts.only) carry.set(slot, { left: main.days - 1, parts: rows.map((x) => ({ part: x.part, recipe_id: x.recipe_id, product_id: x.product_id })) });
       }
       if (!opts.only) {
         const T = opts.target || 2000;

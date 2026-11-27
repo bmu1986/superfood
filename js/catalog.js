@@ -7,17 +7,19 @@
     return lines.map((l) => {
       const c = l.split('\t');
       const o = Object.fromEntries(head.map((h, i) => [h, c[i] ?? '']));
-      const row = { id: o.id, name: o.name, aliases: o.aliases, dept: o.dept, diet: o.diet || 'v', flags: o.flags || '', updated_at: Number(o.updated), deleted: 0 };
+      const row = { id: o.id, name: o.name, aliases: o.aliases, dept: o.dept, diet: o.diet || 'v', flags: o.flags || '', updated_at: Number(o.updated), deleted: o.deleted === '1' ? 1 : 0 };
+      if (o.photo_url) row.photo_url = o.photo_url;
       for (const k of NUM) row[k] = Number(String(o[k]).replace(',', '.')) || 0;
       if (!row.yield) row.yield = 1;
       return row;
     });
   }
   const TAGS = [
-    ['t-bystro', 'Быстро', '#14a982'], ['t-bez-izzhogi', 'Без изжоги', '#f4a259'], ['t-izzhoga', 'Изжога', '#e5484d'],
+    ['t-bystro', 'Быстро', '#14a982'], ['t-izzhoga', 'Изжога', '#e5484d'],
     ['t-ostroe', 'Острое', '#d9432b'], ['t-detyam', 'Детям', '#a06cd5'], ['t-prazdnik', 'Праздничное', '#3b82f6'],
   ];
-  function tagRows(t) { return TAGS.map(([id, name, color], i) => ({ id, name, color, sort: i, updated_at: t, deleted: 0 })); }
+  // «Без изжоги» is gone since 0.3: heartburn is only a red mark, its absence means none
+  function tagRows(t) { return [...TAGS.map(([id, name, color], i) => ({ id, name, color, sort: i, updated_at: t, deleted: 0 })), { id: 't-bez-izzhogi', name: 'Без изжоги', color: '#f4a259', sort: 9, updated_at: 1795802900000, deleted: 1 }]; }
   function parseRecipes(list) {
     const byName = Object.fromEntries(TAGS.map(([id, name]) => [name, id]));
     return list.map((r) => ({

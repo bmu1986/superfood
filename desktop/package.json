@@ -1,6 +1,6 @@
 {
   "name": "superfood",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SuperFood — рецепты, меню на неделю и список покупок",
   "main": "main.js",
   "productName": "SuperFood",

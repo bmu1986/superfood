@@ -27,5 +27,9 @@
       items: r.items, tags: (r.tags || []).map((n) => byName[n]).filter(Boolean),
     }));
   }
-  root.Catalog = { parseProducts, parseRecipes, tagRows, TAGS };
+  const DEPTS = [['veg', 'Овощи и зелень'], ['fru', 'Фрукты и ягоды'], ['mea', 'Мясо и птица'], ['fis', 'Рыба и морепродукты'], ['dai', 'Молочное и яйца'],
+    ['gro', 'Крупы, макароны, бобовые'], ['bre', 'Хлеб'], ['bak', 'Бакалея'], ['can', 'Консервы'], ['sau', 'Соусы и специи'], ['nut', 'Орехи и сухофрукты'],
+    ['frz', 'Заморозка'], ['drk', 'Напитки'], ['oth', 'Другое']];
+  function deptRows(t) { return DEPTS.map(([id, name], i) => ({ id, name, sort: i, updated_at: t, deleted: 0 })); }
+  root.Catalog = { parseProducts, parseRecipes, tagRows, deptRows, TAGS, DEPTS };
 })(typeof window !== 'undefined' ? window : globalThis);

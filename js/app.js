@@ -3,7 +3,7 @@
 (function () {
   const { Store, Blobs, IDB, uid, Dropbox, startAuth, finishAuth, sync, photoBytes, Pending } = window.SF;
   const F = window.Food;
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
 
   // ---------- DOM helpers ----------
   const $ = (s, r = document) => r.querySelector(s);
@@ -44,7 +44,7 @@
   let store = null, dbx = null, model = null;
   let cfg = { theme: 'auto', view: 'shop', weekOffset: 0 };
   const saveCfg = () => IDB.set('kv', 'cfg', cfg);
-  const st = { recipeId: null, servings: null, rq: '', rfilters: {}, role: '', sync: { running: false }, photoUrls: new Map(), prodQ: '', page: null };
+  const st = { recipeId: null, servings: null, rq: '', rfilters: {}, role: '', sync: { running: false }, photoUrls: new Map(), prodQ: '', page: null, animate: true };
   const wideMQ = matchMedia('(min-width: 768px)');
   const threeMQ = matchMedia('(min-width: 1180px)');
   const isWide = () => wideMQ.matches;
@@ -62,13 +62,19 @@
       tags: store.all('SELECT * FROM tags WHERE deleted = 0 ORDER BY sort, name'),
       recipeTags: store.all('SELECT * FROM recipe_tags WHERE deleted = 0'),
     });
+    model.depts = store.all('SELECT * FROM depts WHERE deleted = 0 ORDER BY sort, name');
   }
+  // shop departments: the user's own list, then "check at home" for salt, oil and spices
+  const deptList = () => [...model.depts.map((d) => [d.id, d.name]), ['home', F.DEPT_NAME.home]];
+  const deptName = (id) => (model.depts.find((d) => d.id === id) || {}).name || (id === 'home' ? F.DEPT_NAME.home : 'Другое');
+  const deptOf = (id) => (id === 'home' || model.depts.some((d) => d.id === id) ? id : 'oth');
 
   // ---------- theme / toast / sheets ----------
   const darkMQ = matchMedia('(prefers-color-scheme: dark)');
   function applyTheme() {
     const dark = cfg.theme === 'dark' || (cfg.theme !== 'light' && darkMQ.matches);
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    document.documentElement.classList.toggle('no-anim', cfg.anim === false);
     for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.content = dark ? '#16181c' : '#f6f7f9';
   }
   darkMQ.addEventListener('change', applyTheme);
@@ -124,7 +130,7 @@
   function paint(el, r, letter = true) {
     el.style.backgroundImage = artStyle(r);
     if (letter && !r.photo) { el.classList.add('ph-art'); el.textContent = (r.title || '?').trim().charAt(0).toUpperCase(); }
-    if (r.photo) photoUrl(r.photo).then((u) => { if (u) { el.style.backgroundImage = `url("${u}")`; el.textContent = ''; el.classList.remove('ph-art'); } });
+    if (r.photo) photoUrl(r.photo).then((u) => { if (u) { el.style.backgroundImage = `url("${u}")`; if (letter) el.textContent = ''; el.classList.remove('ph-art'); } });
     return el;
   }
   async function resizeImage(file) {
@@ -153,7 +159,7 @@
 
   // ---------- layout ----------
   const VIEWS = [['shop', 'Покупки', I.cart], ['menu', 'Меню', I.cal], ['recipes', 'Рецепты', I.book], ['more', 'Ещё', I.gear]];
-  function go(view) { cfg.view = view; st.page = null; saveCfg(); render(); $('#scroll').scrollTop = 0; }
+  function go(view) { cfg.view = view; st.page = null; st.animate = true; saveCfg(); render(); $('#scroll').scrollTop = 0; }
   function render() {
     document.body.classList.toggle('wide', isWide());
     document.body.classList.toggle('three', threeMQ.matches);
@@ -166,6 +172,10 @@
     bar.innerHTML = ''; list.innerHTML = '';
     fab.style.display = 'none';
     ({ shop: renderShop, menu: renderMenu, recipes: renderRecipes, more: renderMore }[cfg.view] || renderShop)(bar, list, fab);
+    if (st.animate) {
+      st.animate = false;
+      [...list.querySelectorAll('.srow2, .dept, .day, .rcard, .sg-card, .prod, .stats, .empty')].slice(0, 40).forEach((el, i) => { el.style.setProperty('--i', i); el.classList.add('enter'); });
+    }
     renderDetail();
   }
   const shopLeft = () => (store ? store.get('SELECT COUNT(*) AS n FROM shop WHERE deleted = 0 AND done = 0').n : 0);
@@ -190,11 +200,11 @@
       return;
     }
     const byDept = new Map();
-    for (const r of left) { const d = r.dept || 'oth'; if (!byDept.has(d)) byDept.set(d, []); byDept.get(d).push(r); }
-    for (const [d] of F.DEPTS) {
+    for (const r of left) { const d = deptOf(r.dept); if (!byDept.has(d)) byDept.set(d, []); byDept.get(d).push(r); }
+    for (const [d, dn] of deptList()) {
       const g = byDept.get(d);
       if (!g) continue;
-      list.append(h('div', { class: 'dept' }, h('span', {}, F.DEPT_NAME[d]), h('span', {}, g.length)));
+      list.append(h('div', { class: 'dept' }, h('span', {}, dn), h('span', {}, g.length)));
       for (const r of g) list.append(shopRow(r));
     }
     const done = rows.filter((r) => r.done);
@@ -204,10 +214,11 @@
     }
   }
   function shopRow(r) {
-    const toggle = () => { store.upsert('shop', { id: r.id, done: r.done ? 0 : 1 }); render(); };
+    const toggle = () => { st.popId = r.id; store.upsert('shop', { id: r.id, done: r.done ? 0 : 1 }); render(); };
     const inner = h('div', { class: 'inner' }, cbEl(r.done, (e) => { e.stopPropagation(); toggle(); }),
       h('div', { class: 'sname' }, r.name, r.note ? h('small', {}, shortNote(r.note)) : null),
       r.qty != null || r.unit ? h('span', { class: 'qty' }, F.fmtQty(r.qty, r.unit)) : null);
+    if (st.popId === r.id) { st.popId = null; inner.firstChild.classList.add('pop'); }
     const row = h('div', { class: 'srow2' + (r.done ? ' done' : '') }, h('div', { class: 'swipe-bg ok' }, r.done ? 'Вернуть' : 'Куплено'), h('div', { class: 'swipe-bg del' }, 'Удалить'), inner);
     // swipe right = bought, swipe left = delete
     let x0 = null, y0 = 0, dx = 0, moved = false;
@@ -241,7 +252,7 @@
     const p = F.parseLine(text, model.index);
     if (!p) return;
     const prod = p.product_id ? model.P.get(p.product_id) : null;
-    addShopItems([{ product_id: p.product_id, name: prod ? prod.name : p.name, qty: p.qty, unit: p.unit, dept: prod ? (String(prod.flags).includes('b') ? 'home' : prod.dept) : 'oth', note: '' }], 'manual');
+    addShopItems([{ product_id: p.product_id, name: prod ? prod.name : p.name, qty: p.qty, unit: p.unit, dept: prod ? (String(prod.flags).includes('b') ? 'home' : deptOf(prod.dept)) : 'oth', note: '' }], 'manual');
   }
   // add or sum into existing open rows of the same product and unit
   function addShopItems(items, source) {
@@ -253,7 +264,7 @@
         const notes = [...new Set([...(same.note ? same.note.split(', ') : []), ...(it.note ? it.note.split(', ') : [])])].join(', ');
         store.upsert('shop', { id: same.id, qty: same.qty != null && it.qty != null ? Math.round((same.qty + it.qty) * 100) / 100 : same.qty ?? it.qty, note: notes });
       } else {
-        store.upsert('shop', { id: uid(), name: it.name, product_id: it.product_id || null, qty: it.qty ?? null, unit: it.unit || '', dept: it.dept || 'oth', note: it.note || '', done: 0, source, sort: maxSort + i, created_at: Date.now() });
+        store.upsert('shop', { id: uid(), name: it.name, product_id: it.product_id || null, qty: it.qty ?? null, unit: it.unit || '', dept: deptOf(it.dept), note: it.note || '', done: 0, source, sort: maxSort + i, created_at: Date.now() });
       }
     }));
   }
@@ -261,9 +272,16 @@
     const name = h('input', { class: 'field', value: r.name });
     const qty = h('input', { class: 'field', value: r.qty ?? '', inputmode: 'decimal', placeholder: 'Сколько' });
     const unit = h('select', { class: 'field' }, ['', 'шт', 'г', 'кг', 'мл', 'л', 'уп.', 'банка', 'пучок'].map((u) => h('option', { value: u, selected: (r.unit || '') === u ? true : null }, u || '—')));
-    const dept = h('select', { class: 'field' }, F.DEPTS.map(([k, n]) => h('option', { value: k, selected: r.dept === k ? true : null }, n)));
-    const save = () => { store.upsert('shop', { id: r.id, name: name.value.trim() || r.name, qty: qty.value.trim() === '' ? null : Number(qty.value.replace(',', '.')), unit: unit.value, dept: dept.value }); s.close(); render(); };
-    const s = sheet('Покупка', h('div', { class: 'form' }, name, h('div', { class: 'row2' }, qty, unit), h('div', { class: 'lbl' }, 'Отдел'), dept,
+    const dept = h('select', { class: 'field' }, deptList().map(([k, n]) => h('option', { value: k, selected: deptOf(r.dept) === k ? true : null }, n)));
+    const save = () => {
+      store.batch(() => {
+        store.upsert('shop', { id: r.id, name: name.value.trim() || r.name, qty: qty.value.trim() === '' ? null : Number(qty.value.replace(',', '.')), unit: unit.value, dept: dept.value });
+        // the product remembers its department, so next time it lands there by itself
+        if (r.product_id && dept.value !== 'home' && dept.value !== r.dept && model.P.get(r.product_id)) store.upsert('products', { id: r.product_id, dept: dept.value });
+      });
+      s.close(); render();
+    };
+    const s = sheet('Покупка', h('div', { class: 'form' }, name, h('div', { class: 'row2' }, qty, unit), h('div', { class: 'lbl' }, r.product_id ? 'Отдел (продукт запомнит его)' : 'Отдел'), dept,
       r.note ? h('p', { class: 'hint' }, 'Для: ' + r.note) : null,
       h('button', { class: 'btn primary', onclick: save }, 'Сохранить'),
       h('button', { class: 'btn', style: { color: 'var(--red)' }, onclick: () => { s.close(); removeShop(r); } }, 'Удалить')));
@@ -443,7 +461,8 @@
     const load = () => store.all('SELECT * FROM plan WHERE deleted = 0 AND date = ? AND slot = ? ORDER BY CASE part WHEN \'main\' THEN 0 WHEN \'side\' THEN 1 ELSE 2 END', [date, slot]);
     const body = h('div', {});
     const [wd, dm] = dayName(date);
-    const sh = sheet(`${F.SLOT_NAME[slot]} · ${wd}, ${dm}`, body, { onClose: render });
+    const sh = sheet(`${F.SLOT_NAME[slot]} · ${wd}, ${dm}`, body, { onClose: () => { st.redrawSheet = null; render(); } });
+    st.redrawSheet = () => draw();
     const draw = () => {
       const rows = load();
       body.innerHTML = '';
@@ -458,6 +477,12 @@
           h('div', { class: 'stepper' }, h('button', { onclick: () => setG((r.grams || 0) - step) }, '−'), h('b', {}, `${Math.round(r.grams || 0)} г`), h('button', { onclick: () => setG((r.grams || 0) + step) }, '+')),
           h('button', { class: 'mbtn', 'aria-label': 'Заменить', html: I.reroll(), onclick: () => swapPart(date, slot, r.part, draw) }),
           r.part !== 'main' ? h('button', { class: 'mbtn', 'aria-label': 'Убрать', html: I.close(), onclick: () => { store.softDelete('plan', r.id); draw(); } }) : null));
+        if (i.r && i.r.items.length) {
+          const isOpen = st.compOpen === r.id;
+          block.append(h('button', { class: 'comp-toggle' + (isOpen ? ' on' : ''), onclick: () => { st.compOpen = isOpen ? null : r.id; draw(); } },
+            isOpen ? 'Скрыть состав' : `Состав: ${i.r.items.length} ${plural(i.r.items.length, 'продукт', 'продукта', 'продуктов')} · изменить`));
+          if (isOpen) block.append(compEditor(i.r, (r.grams || 0) / (i.r.nut.weight || 1), `Количества показаны на эту порцию (${Math.round(r.grams || 0)} г). Изменения сохраняются в самом рецепте.`));
+        }
       }
       body.append(block);
       const has = (p) => rows.some((r) => r.part === p);
@@ -552,7 +577,8 @@
     const k = serv / (r.servings || 1);
     const hero = paint(h('div', { class: 'rv-hero' }), r, false);
     if (!r.photo) hero.append(h('div', { class: 'ph-art' }, r.title.charAt(0).toUpperCase()));
-    hero.append(h('button', { class: 'rv-close', 'aria-label': 'Закрыть', html: I.close(20), onclick: close }),
+    hero.append(h('button', { class: 'rv-photo', onclick: async () => { const hash = await choosePhoto(r.title); if (hash) { store.upsert('recipes', { id: r.id, photo: hash }); toast('Фото обновлено'); } } }, r.photo ? 'Сменить фото' : 'Найти фото'),
+      h('button', { class: 'rv-close', 'aria-label': 'Закрыть', html: I.close(20), onclick: close }),
       h('button', { class: 'rv-close rv-fav' + (r.fav ? ' on' : ''), 'aria-label': 'Любимое', html: I.heart(20, r.fav ? 'currentColor' : 'none'), onclick: () => { store.upsert('recipes', { id: r.id, fav: r.fav ? 0 : 1 }); } }));
     const per = r.nut.kcal / (r.servings || 1);
     const labels = [...r.labels];
@@ -567,7 +593,9 @@
       r.health.why.length ? h('div', { class: 'whybox' }, r.health.why.map(([s2, t]) => h('span', { class: s2 === '+' ? 'p' : 'm' }, t)), h('span', { class: 'hint', style: { margin: 0 } }, `На порцию: белки ${Math.round(r.nut.p / r.servings)} г, жиры ${Math.round(r.nut.f / r.servings)} г, углеводы ${Math.round(r.nut.c / r.servings)} г. Готовое блюдо около ${kc(r.nut.weight)} г.`)) : null,
       h('div', { class: 'block' },
         h('div', { class: 'block-head' }, h('span', {}, 'Ингредиенты'), h('div', { class: 'stepper' }, h('button', { onclick: () => { st.servings = Math.max(1, serv - 1); renderDetail(); } }, '−'), h('b', {}, `${serv} порц.`), h('button', { onclick: () => { st.servings = serv + 1; renderDetail(); } }, '+'))),
-        r.items.map((i) => h('div', { class: 'ing' + (i.product_id ? '' : ' unk') }, h('span', {}, i.name), h('span', {}, i.qty == null ? 'по вкусу' : F.fmtQty(Math.round(i.qty * k * 100) / 100, i.unit))))),
+        st.compEdit === r.id ? compEditor(r, k, 'Нажми на продукт, чтобы поменять его или количество. Крестик убирает.')
+          : r.items.map((i) => h('div', { class: 'ing' + (i.product_id ? '' : ' unk') }, h('span', {}, i.name), h('span', {}, i.qty == null ? 'по вкусу' : F.fmtQty(Math.round(i.qty * k * 100) / 100, i.unit)))),
+        h('button', { class: 'comp-toggle' + (st.compEdit === r.id ? ' on' : ''), onclick: () => { st.compEdit = st.compEdit === r.id ? null : r.id; renderDetail(); } }, st.compEdit === r.id ? 'Готово' : 'Изменить состав')),
       r.steps ? h('div', { class: 'block' }, h('div', { class: 'block-head' }, h('span', {}, 'Как готовить')), h('div', { class: 'steps' }, r.steps)) : null,
       r.source ? h('p', { class: 'hint', style: { padding: '0 18px 10px', overflowWrap: 'anywhere' } }, 'Источник: ', r.source) : null,
       h('div', { class: 'actions' },
@@ -597,16 +625,10 @@
     const isNew = !r;
     r = r || { title: '', role: 'main', meals: 'ld', servings: 2, time: 30, steps: '', source: '', items: [], tagIds: [], needs_side: 0, needs_sauce: 0 };
     let photo = r.photo || null;
-    const pick = h('label', { class: 'pick' }, h('span', {}, photo ? 'Сменить фото' : 'Добавить фото блюда'));
+    const pick = h('button', { class: 'pick', type: 'button' }, h('span', {}, photo ? 'Сменить фото' : 'Найти фото блюда'));
     const setPick = () => { if (photo) photoUrl(photo).then((u) => { if (u) pick.style.backgroundImage = `url("${u}")`; }); };
     setPick();
-    const file = h('input', { type: 'file', accept: 'image/*' });
-    file.onchange = async () => {
-      const f = file.files[0]; if (!f) return;
-      pick.firstChild.textContent = 'Обрабатываю…';
-      try { const bytes = await resizeImage(f); photo = await Blobs.put(bytes); await Pending.add(photo); setPick(); pick.firstChild.textContent = 'Сменить фото'; } catch (e) { pick.firstChild.textContent = 'Не удалось прочитать фото'; }
-    };
-    pick.append(file);
+    pick.onclick = async () => { const hash = await choosePhoto(title.value.trim()); if (hash) { photo = hash; setPick(); pick.firstChild.textContent = 'Сменить фото'; } };
     const title = h('input', { class: 'field', placeholder: 'Название', value: r.title, style: { fontWeight: '650' } });
     const role = h('select', { class: 'field' }, F.ROLES.map(([k, n]) => h('option', { value: k, selected: r.role === k ? true : null }, n)));
     const meals = new Set(String(r.meals || ''));
@@ -674,6 +696,7 @@
   // =====================================================================
   function renderMore(bar, list, fab) {
     if (st.page === 'products') return renderProducts(bar, list, fab);
+    if (st.page === 'depts') return renderDepts(bar, list, fab);
     header(bar, 'Ещё');
     const s = S();
     const page = h('div', { class: 'settings' });
@@ -686,12 +709,14 @@
       h('div', { class: 'spad' }, h('p', { class: 'hint' }, 'Подбор меню делит цель между приёмами пищи и считает граммы порций так, чтобы день уложился в цель. Если приём выключен, его доля делится между остальными.'))));
     page.append(group('Справочник',
       h('button', { class: 'srow btn-row', onclick: () => { st.page = 'products'; render(); } }, `Продукты и калории · ${model.products.length}`),
+      h('button', { class: 'srow btn-row', onclick: () => { st.page = 'depts'; render(); } }, `Отделы магазина · ${model.depts.length}`),
       h('button', { class: 'srow btn-row', onclick: editTags }, `Свои метки · ${model.T.size}`),
       h('button', { class: 'srow btn-row', onclick: () => loadCatalog(true) }, 'Проверить обновления справочника'),
       h('div', { class: 'spad' }, h('p', { class: 'hint' }, 'Справочник калорий и стартовые рецепты приходят с обновлениями программы. Твои правки не затираются: побеждает более свежее изменение.'))));
     page.append(syncGroup(group));
     const themeSeg = h('div', { class: 'seg' }, [['auto', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Тёмная']].map(([v, l]) => h('button', { class: cfg.theme === v ? 'on' : '', onclick: () => { cfg.theme = v; saveCfg(); applyTheme(); render(); } }, l)));
-    page.append(group('Оформление', h('div', { class: 'spad' }, themeSeg)));
+    const animSw = h('button', { class: 'switch' + (cfg.anim !== false ? ' on' : ''), onclick: () => { cfg.anim = cfg.anim === false; saveCfg(); applyTheme(); render(); } }, h('i'));
+    page.append(group('Оформление', h('div', { class: 'spad' }, themeSeg), h('div', { class: 'srow' }, h('span', {}, 'Плавные анимации'), animSw)));
     const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     page.append(group('Установка и «Поделиться»', h('div', { class: 'spad' },
       !standalone ? h('p', { class: 'hint' }, 'iPhone: в Safari «Поделиться» → «На экран Домой». Компьютер: программа SuperFood для Mac и Windows в папке SuperFood на рабочем столе.') : null,
@@ -746,7 +771,7 @@
       key, openBtn, h('p', { class: 'hint' }, 'Dropbox покажет код. Скопируй его и вставь сюда:'), code, connect, err));
   }
   function renderProducts(bar, list, fab) {
-    bar.append(h('div', { class: 'bar-row' }, h('button', { class: 'back', onclick: () => { st.page = null; render(); }, html: I.left() + ' Ещё' })), h('div', { class: 'bar-row' }, h('h1', {}, 'Продукты')));
+    bar.append(h('div', { class: 'bar-row' }, h('button', { class: 'back', onclick: () => { st.page = null; render(); }, html: I.left() + ' Ещё' }), h('button', { class: 'txt-btn', onclick: () => { st.page = 'depts'; render(); } }, 'Отделы магазина')), h('div', { class: 'bar-row' }, h('h1', {}, 'Продукты')));
     const q = h('input', { class: 'search', placeholder: 'Поиск', value: st.prodQ, type: 'search' });
     bar.append(h('div', { class: 'quick', style: { padding: '8px 0 0' } }, q));
     const box = h('div', {});
@@ -756,8 +781,9 @@
       const t = F.norm(q.value); st.prodQ = q.value;
       const ps = model.products.filter((p) => !t || F.norm(p.name + ' ' + p.aliases).includes(t));
       let lastDept = null;
-      for (const p of [...ps].sort((a, b) => F.DEPTS.findIndex((d) => d[0] === a.dept) - F.DEPTS.findIndex((d) => d[0] === b.dept) || a.name.localeCompare(b.name, 'ru'))) {
-        if (p.dept !== lastDept) { box.append(h('div', { class: 'dept' }, F.DEPT_NAME[p.dept] || p.dept)); lastDept = p.dept; }
+      const order = deptList().map((d) => d[0]);
+      for (const p of [...ps].sort((a, b) => order.indexOf(deptOf(a.dept)) - order.indexOf(deptOf(b.dept)) || a.name.localeCompare(b.name, 'ru'))) {
+        if (deptOf(p.dept) !== lastDept) { lastDept = deptOf(p.dept); box.append(h('div', { class: 'dept' }, deptName(lastDept))); }
         box.append(h('div', { class: 'prod', onclick: () => editProduct(p) }, h('span', {}, p.name, h('small', {}, `Б ${F.fmtNum(p.protein)} · Ж ${F.fmtNum(p.fat)} · У ${F.fmtNum(p.carbs)}${String(p.flags).includes('g') ? ' · гарнир' : ''}${String(p.flags).includes('s') ? ' · соус' : ''}`)), h('b', {}, `${kc(p.kcal)} ккал`)));
       }
     };
@@ -770,7 +796,7 @@
     const f = (v, ph, num = true) => h('input', { class: 'field', value: v ?? '', placeholder: ph, inputmode: num ? 'decimal' : null });
     const name = f(p.name, 'Название', false), aliases = f(p.aliases, 'Другие названия через запятую', false);
     const kcal = f(p.kcal, 'ккал'), pr = f(p.protein, 'белки'), fa = f(p.fat, 'жиры'), ca = f(p.carbs, 'углеводы'), piece = f(p.piece_g || '', 'вес 1 шт, г'), yl = f(p.yield, 'выход после варки');
-    const dept = h('select', { class: 'field' }, F.DEPTS.filter(([k]) => k !== 'home').map(([k, n]) => h('option', { value: k, selected: p.dept === k ? true : null }, n)));
+    const dept = h('select', { class: 'field' }, model.depts.map((d) => h('option', { value: d.id, selected: deptOf(p.dept) === d.id ? true : null }, d.name)));
     const diet = h('select', { class: 'field' }, [['v', 'Постное (растительное)'], ['f', 'Рыба и морепродукты'], ['c', 'Птица'], ['m', 'Мясо'], ['d', 'Молочное'], ['e', 'Яйца']].map(([k, n]) => h('option', { value: k, selected: p.diet === k ? true : null }, n)));
     const flags = new Set(String(p.flags));
     const fl = h('div', { class: 'chips wrap' });
@@ -801,6 +827,223 @@
       h('button', { class: 'btn primary', onclick: () => { if (name.value.trim()) store.upsert('tags', { id: t.id, name: name.value.trim(), color: t.color, sort: t.sort, deleted: 0 }); sh.close(); } }, 'Сохранить'),
       v !== '+' ? h('button', { class: 'btn', style: { color: 'var(--red)' }, onclick: () => { store.softDelete('tags', t.id); sh.close(); } }, 'Удалить') : null));
   }
+  // ---------- shop departments: a directory you edit ----------
+  function renderDepts(bar, list, fab) {
+    bar.append(h('div', { class: 'bar-row' }, h('button', { class: 'back', onclick: () => { st.page = 'products'; render(); }, html: I.left() + ' Продукты' })), h('div', { class: 'bar-row' }, h('h1', {}, 'Отделы магазина')),
+      h('div', { class: 'bar-sub' }, 'В этом порядке идёт список покупок. Стрелками — порядок, нажми на отдел, чтобы переименовать или перенести продукты.'));
+    const counts = new Map();
+    for (const p of model.products) counts.set(deptOf(p.dept), (counts.get(deptOf(p.dept)) || 0) + 1);
+    const ds = model.depts;
+    const move = (i, k) => {
+      const arr = [...ds]; const [x] = arr.splice(i, 1); arr.splice(i + k, 0, x);
+      store.batch(() => arr.forEach((d, j) => { if (d.sort !== j) store.upsert('depts', { id: d.id, sort: j }); }));
+    };
+    const card = h('div', { class: 'sg-card', style: { margin: '6px 14px' } });
+    ds.forEach((d, i) => card.append(h('div', { class: 'srow tabrow', style: { cursor: 'pointer' }, onclick: () => deptSheet(d) },
+      h('span', { class: 'tr-label' }, d.name, h('small', { style: { color: 'var(--muted)', fontWeight: '400' } }, ` · ${counts.get(d.id) || 0}`)),
+      h('button', { class: 'tr-btn', disabled: i === 0 ? true : null, 'aria-label': 'Выше', html: svg('<path d="M6 15l6-6 6 6"/>', 18, 2), onclick: (e) => { e.stopPropagation(); move(i, -1); } }),
+      h('button', { class: 'tr-btn', disabled: i === ds.length - 1 ? true : null, 'aria-label': 'Ниже', html: svg('<path d="M6 9l6 6 6-6"/>', 18, 2), onclick: (e) => { e.stopPropagation(); move(i, 1); } }))));
+    list.append(card);
+    fab.style.display = ''; fab.innerHTML = I.plus();
+    fab.onclick = () => {
+      const name = h('input', { class: 'field', placeholder: 'Например: Для дома' });
+      const s = sheet('Новый отдел', h('div', { class: 'form' }, name, h('button', { class: 'btn primary', onclick: () => { if (name.value.trim()) store.upsert('depts', { id: 'd-' + uid(), name: name.value.trim(), sort: ds.length, deleted: 0 }); s.close(); } }, 'Добавить')));
+      setTimeout(() => name.focus(), 250);
+    };
+  }
+  function deptSheet(d) {
+    const body = h('div', {});
+    const s = sheet(d.name, body, { full: true, onClose: render });
+    const draw = () => {
+      body.innerHTML = '';
+      const cur = model.depts.find((x) => x.id === d.id) || d;
+      const name = h('input', { class: 'field', value: cur.name });
+      name.onchange = () => { if (name.value.trim()) store.upsert('depts', { id: d.id, name: name.value.trim() }); };
+      const ps = model.products.filter((p) => deptOf(p.dept) === d.id).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+      const add = h('input', { class: 'search', placeholder: 'Перенести сюда продукт: начни вводить название', type: 'search' });
+      const found = h('div', { class: 'menu' });
+      add.oninput = () => {
+        found.innerHTML = '';
+        for (const p of model.index.search(add.value, 12).filter((p) => deptOf(p.dept) !== d.id)) {
+          found.append(h('button', { class: 'menu-item', onclick: () => { store.upsert('products', { id: p.id, dept: d.id }); setTimeout(draw, 60); } }, h('span', { class: 'mi-label' }, p.name), h('span', { class: 'mi-hint' }, 'из «' + deptName(deptOf(p.dept)) + '»')));
+        }
+      };
+      body.append(h('div', { class: 'form' }, h('div', { class: 'lbl' }, 'Название'), name, add), found,
+        h('div', { class: 'dept' }, h('span', {}, 'Продукты в отделе'), h('span', {}, ps.length)),
+        h('div', {}, ps.map((p) => h('div', { class: 'prod', onclick: async () => {
+          const to = await choose(`Перенести «${p.name}» в…`, model.depts.filter((x) => x.id !== d.id).map((x) => ({ label: x.name, value: x.id })));
+          if (to) { store.upsert('products', { id: p.id, dept: to }); setTimeout(draw, 60); }
+        } }, h('span', {}, p.name), h('b', {}, 'перенести')))),
+        d.id !== 'oth' ? h('div', { class: 'form' }, h('button', { class: 'btn', style: { color: 'var(--red)' }, onclick: async () => {
+          if (!(await confirmDlg(`Удалить отдел «${cur.name}»? Его продукты перейдут в «Другое».`))) return;
+          store.batch(() => {
+            for (const p of model.products) if (deptOf(p.dept) === d.id) store.upsert('products', { id: p.id, dept: 'oth' });
+            for (const r of store.all('SELECT id FROM shop WHERE deleted = 0 AND dept = ?', [d.id])) store.upsert('shop', { id: r.id, dept: 'oth' });
+            store.softDelete('depts', d.id);
+          });
+          s.close();
+        } }, 'Удалить отдел')) : null);
+    };
+    draw();
+  }
+
+  // ---------- dish composition: view and edit right where it is shown (menu, recipe) ----------
+  // k scales the recipe to what is shown (a portion in the menu, the chosen servings in the recipe)
+  function compEditor(r, k, note) {
+    const box = h('div', { class: 'comp' });
+    const saveItems = (items) => store.saveRecipe({ id: r.id, title: r.title, created_at: r.created_at }, items.map((i) => ({ id: i.id, product_id: i.product_id, name: i.name, qty: i.qty, unit: i.unit })), null);
+    for (const it of r.items) {
+      const shown = it.qty == null ? 'по вкусу' : F.fmtQty(Math.round(it.qty * k * 100) / 100, it.unit);
+      const kcal = it.p ? Math.round(it.p.kcal * it.g * k / 100) : null;
+      box.append(h('div', { class: 'ing edit' + (it.product_id ? '' : ' unk') },
+        h('span', { class: 'in', onclick: () => editItem(it) }, it.name, kcal != null ? h('small', {}, `${kcal} ккал`) : null),
+        h('span', { class: 'iq', onclick: () => editItem(it) }, shown),
+        h('button', { class: 'mbtn', 'aria-label': 'Убрать', html: I.close(16), onclick: () => { saveItems(r.items.filter((x) => x !== it)); toast(`Убрано из «${r.title}»: ${it.name}`, 'Вернуть', () => saveItems(r.items)); } })));
+    }
+    const add = h('input', { class: 'cl-add', placeholder: '+ Добавить продукт, например «сыр 50 г»', enterkeyhint: 'done' });
+    add.onkeydown = (e) => {
+      if (e.key !== 'Enter' || !add.value.trim()) return;
+      const p = F.parseLine(add.value, model.index);
+      if (p) saveItems([...r.items, p]);
+      add.value = '';
+    };
+    box.append(add);
+    if (note) box.append(h('p', { class: 'hint', style: { padding: '0 14px 10px' } }, note));
+    function editItem(it) {
+      const name = h('input', { class: 'field', value: it.name });
+      const qty = h('input', { class: 'field', value: it.qty ?? '', inputmode: 'decimal', placeholder: 'по вкусу' });
+      const unit = h('select', { class: 'field' }, ['', 'г', 'кг', 'мл', 'л', 'шт', 'ст.л.', 'ч.л.', 'стакан', 'зубчик', 'пучок', 'банка', 'щепотка', 'кусок', 'головка', 'уп.'].map((u) => h('option', { value: u, selected: (it.unit || '') === u ? true : null }, u || '—')));
+      const match = h('p', { class: 'hint' });
+      const showMatch = () => { const p = model.index.find(name.value); match.textContent = p ? `В справочнике: ${p.name}, ${p.kcal} ккал на 100 г` : 'Нет в справочнике: калории не посчитаются. Добавь продукт в «Ещё → Продукты».'; };
+      name.oninput = showMatch; showMatch();
+      const s2 = sheet('Ингредиент', h('div', { class: 'form' }, name, h('div', { class: 'row2' }, qty, unit),
+        h('p', { class: 'hint' }, `Количество на весь рецепт (${r.servings} порц.).`), match,
+        h('button', { class: 'btn primary', onclick: () => {
+          const p = model.index.find(name.value);
+          const q = qty.value.trim() === '' ? null : Number(qty.value.replace(',', '.'));
+          saveItems(r.items.map((x) => (x === it ? { ...x, name: p && F.norm(p.name) === F.norm(name.value) ? p.name : name.value.trim(), product_id: p ? p.id : null, qty: q, unit: unit.value } : x)));
+          s2.close();
+        } }, 'Сохранить')));
+    }
+    return box;
+  }
+
+  // ---------- dish photos: own picture or found on the internet, cropped to 4:3 ----------
+  const RU_EN = { 'борщ': 'borscht', 'щи': 'shchi soup', 'уха': 'ukha fish soup', 'плов': 'pilaf', 'гречк': 'buckwheat', 'овсян': 'oatmeal', 'сырник': 'syrniki', 'омлет': 'omelette', 'каша': 'porridge',
+    'суп': 'soup', 'салат': 'salad', 'винегрет': 'vinegret salad', 'курин': 'chicken', 'куриц': 'chicken', 'грудк': 'chicken breast', 'индейк': 'turkey', 'говядин': 'beef', 'свинин': 'pork', 'котлет': 'cutlets',
+    'тефтел': 'meatballs', 'треск': 'cod', 'сёмг': 'salmon', 'семг': 'salmon', 'лосос': 'salmon', 'минтай': 'pollock', 'судак': 'zander', 'рыб': 'fish', 'кревет': 'shrimp', 'макарон': 'pasta', 'паста': 'pasta',
+    'рис': 'rice', 'булгур': 'bulgur', 'картоф': 'potato', 'пюре': 'mashed potatoes', 'фасол': 'beans', 'стручков': 'green beans', 'брокколи': 'broccoli', 'капуст': 'cabbage', 'тушён': 'stew', 'рагу': 'vegetable stew',
+    'грибн': 'mushroom', 'гриб': 'mushrooms', 'тыкв': 'pumpkin', 'чечевиц': 'lentil', 'нут': 'chickpea', 'хумус': 'hummus', 'творог': 'cottage cheese', 'йогурт': 'yogurt', 'гранол': 'granola', 'ягод': 'berries',
+    'яблок': 'apple', 'банан': 'banana', 'соус': 'sauce', 'подлив': 'gravy', 'печень': 'liver', 'запечён': 'baked', 'запечен': 'baked', 'пару': 'steamed', 'овощ': 'vegetables', 'тост': 'toast', 'авокадо': 'avocado', 'лобио': 'lobio' };
+  const toEnglish = (q) => { const w = F.norm(q).split(' '); const out = []; for (const x of w) { const k = Object.keys(RU_EN).find((s) => x.startsWith(s)); if (k && !out.includes(RU_EN[k])) out.push(RU_EN[k]); } return out.join(' ') || q; };
+  async function searchPhotos(q) {
+    const enc = encodeURIComponent;
+    const get = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const [wiki, commons, ov] = await Promise.all([
+      get(`https://ru.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${enc(q)}&gsrlimit=10&prop=pageimages&piprop=thumbnail&pithumbsize=1200`),
+      get(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=${enc(q + ' filetype:bitmap')}&gsrlimit=24&prop=imageinfo&iiprop=url|mime&iiurlwidth=1200`),
+      get(`https://api.openverse.org/v1/images/?q=${enc(toEnglish(q))}&page_size=24&mature=false&extension=jpg`),
+    ]);
+    const out = [];
+    for (const p of Object.values(wiki?.query?.pages || {}).sort((a, b) => a.index - b.index)) if (p.thumbnail) out.push({ thumb: p.thumbnail.source, full: p.thumbnail.source, from: 'Википедия' });
+    for (const p of Object.values(commons?.query?.pages || {}).sort((a, b) => a.index - b.index)) { const ii = p.imageinfo && p.imageinfo[0]; if (ii && /jpe?g|png|webp/.test(ii.mime || '')) out.push({ thumb: ii.thumburl, full: ii.thumburl, from: 'Викисклад' }); }
+    for (const r of ov?.results || []) out.push({ thumb: r.thumbnail, full: r.thumbnail, from: 'Openverse', alt: r.url });
+    const seen = new Set();
+    return out.filter((x) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb));
+  }
+  // pick a photo for a recipe: resolves with the saved photo hash (or undefined)
+  function choosePhoto(query) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (hash) => { done = true; s.close(); resolve(hash); };
+      const q = h('input', { class: 'search', value: query || '', placeholder: 'Название блюда', type: 'search', enterkeyhint: 'search' });
+      const file = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+      const grid = h('div', { class: 'pgrid' });
+      const status = h('p', { class: 'hint', style: { padding: '0 16px' } });
+      file.onchange = () => { const f = file.files[0]; if (f) cropPhoto(URL.createObjectURL(f)).then((hash) => { if (hash) finish(hash); }); };
+      let seq = 0;
+      const run = async () => {
+        const my = ++seq;
+        grid.innerHTML = '';
+        if (!q.value.trim()) { status.textContent = 'Напиши название блюда.'; return; }
+        status.textContent = 'Ищу фото…';
+        for (let i = 0; i < 6; i++) grid.append(h('div', { class: 'pcell sk' }));
+        const res = await searchPhotos(q.value.trim());
+        if (my !== seq) return;
+        grid.innerHTML = '';
+        status.textContent = res.length ? 'Нажми на фото: оно обрежется под карточку, положение можно подвинуть.' : (navigator.onLine ? 'Ничего не нашлось. Попробуй короче, например «борщ».' : 'Нет интернета.');
+        res.forEach((r, i) => {
+          const img = h('img', { src: r.thumb, loading: 'lazy', alt: '', referrerpolicy: 'no-referrer' });
+          img.onerror = () => cell.remove();
+          const cell = h('button', { class: 'pcell', style: { '--i': i }, onclick: () => cropPhoto(r.full, r.from).then((hash) => { if (hash) finish(hash); }) }, img, h('small', {}, r.from));
+          grid.append(cell);
+        });
+      };
+      q.onkeydown = (e) => { if (e.key === 'Enter') run(); };
+      const s = sheet('Фото блюда', h('div', {},
+        h('div', { class: 'quick' }, q, h('button', { class: 'btn primary', onclick: run }, 'Найти')),
+        h('div', { class: 'quick' }, h('button', { class: 'btn', style: { flex: 1 }, onclick: () => file.click() }, 'Своё фото с телефона или компьютера'), file),
+        status, grid), { full: true, onClose: () => { if (!done) resolve(undefined); } });
+      run();
+    });
+  }
+  // crop to 4:3: the picture covers the frame, drag to move, slider to zoom
+  async function loadImage(src) {
+    const tryImg = (u) => new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.referrerPolicy = 'no-referrer'; im.onload = () => res(im); im.onerror = rej; im.src = u; });
+    try { return await tryImg(src); } catch { /* try through fetch */ }
+    const r = await fetch(src); if (!r.ok) throw new Error(r.status);
+    return tryImg(URL.createObjectURL(await r.blob()));
+  }
+  function cropPhoto(src, from) {
+    return new Promise(async (resolve) => {
+      let done = false;
+      const frame = h('div', { class: 'crop' });
+      const msg = h('div', { class: 'crop-msg' }, 'Загружаю…');
+      frame.append(msg);
+      const zoom = h('input', { type: 'range', min: 1, max: 3, step: 0.01, value: 1, class: 'zoom', 'aria-label': 'Масштаб' });
+      const ok = h('button', { class: 'btn primary', disabled: true }, 'Готово');
+      const s = sheet('Обрезка под карточку', h('div', { class: 'form' }, frame, h('div', { class: 'srow plain' }, h('span', {}, 'Масштаб'), zoom),
+        h('p', { class: 'hint' }, 'Перетащи фото, чтобы выбрать, что попадёт в кадр.' + (from ? ` Источник: ${from}.` : '')), ok), { full: true, onClose: () => { if (!done) resolve(undefined); } });
+      let im;
+      try { im = await loadImage(src); } catch { msg.textContent = 'Это фото не скачивается. Выбери другое.'; return; }
+      msg.remove();
+      const view = h('img', { src: im.src, draggable: 'false', class: 'crop-img' });
+      frame.append(view);
+      let z = 1, cx = 0.5, cy = 0.5; // centre of the crop in image fractions
+      const place = () => {
+        const W = frame.clientWidth, H = frame.clientHeight;
+        const base = Math.max(W / im.naturalWidth, H / im.naturalHeight) * z;
+        const w = im.naturalWidth * base, hh = im.naturalHeight * base;
+        const hx = W / 2 / w, hy = H / 2 / hh;
+        cx = Math.min(1 - hx, Math.max(hx, cx)); cy = Math.min(1 - hy, Math.max(hy, cy));
+        view.style.width = w + 'px'; view.style.height = hh + 'px';
+        view.style.transform = `translate(${W / 2 - cx * w}px, ${H / 2 - cy * hh}px)`;
+        return { base, w, hh };
+      };
+      requestAnimationFrame(place);
+      zoom.oninput = () => { z = Number(zoom.value); place(); };
+      let drag = null;
+      frame.onpointerdown = (e) => { drag = { x: e.clientX, y: e.clientY, cx, cy }; frame.setPointerCapture(e.pointerId); };
+      frame.onpointermove = (e) => { if (!drag) return; const { w, hh } = place(); cx = drag.cx - (e.clientX - drag.x) / w; cy = drag.cy - (e.clientY - drag.y) / hh; place(); };
+      frame.onpointerup = () => { drag = null; };
+      ok.disabled = false;
+      ok.onclick = async () => {
+        ok.disabled = true; ok.textContent = 'Сохраняю…';
+        try {
+          const W = frame.clientWidth, H = frame.clientHeight;
+          const { base } = place();
+          const sw = W / base, sh = H / base;
+          const c = document.createElement('canvas'); c.width = 1400; c.height = 1050;
+          c.getContext('2d').drawImage(im, cx * im.naturalWidth - sw / 2, cy * im.naturalHeight - sh / 2, sw, sh, 0, 0, 1400, 1050);
+          const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.84));
+          const hash = await Blobs.put(new Uint8Array(await blob.arrayBuffer()));
+          await Pending.add(hash);
+          done = true; s.close(); resolve(hash);
+        } catch (e) { ok.disabled = false; ok.textContent = 'Готово'; toast('Не удалось сохранить это фото (сайт не разрешает его копировать). Выбери другое.', null, null, 5000); }
+      };
+    });
+  }
+
   async function resetLocal() {
     if (!(await confirmDlg('Стереть данные на этом устройстве?', 'Стереть'))) return;
     if (cfg.refreshToken && store.isDirty() && !(await confirmDlg('Есть изменения, которые ещё не ушли в Dropbox. Всё равно стереть?', 'Стереть'))) return;
@@ -813,9 +1056,9 @@
   async function loadCatalog(manual = false) {
     try {
       const [tsv, json] = await Promise.all([fetch('data/products.tsv', { cache: 'no-cache' }).then((r) => r.text()), fetch('data/recipes.json', { cache: 'no-cache' }).then((r) => r.text())]);
-      const sig = strHash(tsv) + ':' + strHash(json);
+      const sig = 'v2:' + strHash(tsv) + ':' + strHash(json);
       if (!manual && store.meta('catalog_sig') === sig) return;
-      const n = store.applyCatalog(Catalog.parseProducts(tsv), Catalog.parseRecipes(JSON.parse(json)), Catalog.tagRows(1795788000000));
+      const n = store.applyCatalog(Catalog.parseProducts(tsv), Catalog.parseRecipes(JSON.parse(json)), Catalog.tagRows(1795788000000), Catalog.deptRows(1795788000000));
       store.meta('catalog_sig', sig);
       if (manual) toast(n ? `Справочник обновлён: ${n} изменений` : 'Справочник уже свежий');
     } catch (e) { if (manual) toast('Не удалось загрузить справочник: ' + e.message); }
@@ -871,7 +1114,7 @@
       let rebuildTimer = null;
       store.onChange((local) => {
         clearTimeout(rebuildTimer);
-        rebuildTimer = setTimeout(() => { rebuildModel(); render(); }, 30);
+        rebuildTimer = setTimeout(() => { rebuildModel(); render(); if (st.redrawSheet) st.redrawSheet(); }, 30);
         if (local) scheduleSync();
       });
       render();

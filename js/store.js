@@ -1,9 +1,13 @@
 // SuperFood database: SQLite in the browser (sql.js), working copy in IndexedDB.
 // Same rules as Organizer: every row has updated_at and a deleted flag; sync merges row by row, newest wins.
 (function (root) {
-  const SYNC_TABLES = ['products', 'recipes', 'recipe_items', 'tags', 'recipe_tags', 'plan', 'shop', 'settings'];
+  const SYNC_TABLES = ['depts', 'products', 'recipes', 'recipe_items', 'tags', 'recipe_tags', 'plan', 'shop', 'settings'];
   const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS depts (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, sort REAL DEFAULT 0,
+  updated_at INTEGER NOT NULL, deleted INTEGER DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, aliases TEXT DEFAULT '', dept TEXT DEFAULT 'oth',
   kcal REAL DEFAULT 0, protein REAL DEFAULT 0, fat REAL DEFAULT 0, carbs REAL DEFAULT 0,
@@ -204,7 +208,7 @@ CREATE INDEX IF NOT EXISTS idx_plan_date ON plan(date);
         items.forEach((it, i) => {
           const iid = it.id || uid();
           keep.add(iid);
-          this.upsert('recipe_items', { id: iid, recipe_id: id, product_id: it.product_id || null, name: it.name, qty: it.qty ?? null, unit: it.unit || '', sort: i }, t);
+          this.upsert('recipe_items', { id: iid, recipe_id: id, product_id: it.product_id || null, name: it.name, qty: it.qty ?? null, unit: it.unit || '', sort: i, deleted: 0 }, t);
         });
         for (const o of old) if (!keep.has(o)) this.db.run('UPDATE recipe_items SET deleted = 1, updated_at = ? WHERE id = ?', [t, o]);
         if (tagIds) this.setRecipeTags(id, tagIds, t);
@@ -229,7 +233,7 @@ CREATE INDEX IF NOT EXISTS idx_plan_date ON plan(date);
 
     // Starter catalog (data/products.tsv, data/recipes.json). Catalog rows carry their own updated_at, so they
     // merge like a sync from "the catalog device": new rows arrive, rows you edited later stay yours.
-    applyCatalog(products, recipes, tags) {
+    applyCatalog(products, recipes, tags, depts = []) {
       let n = 0;
       const take = (table, row) => {
         const cur = this.get(`SELECT updated_at FROM ${table} WHERE id = ?`, [row.id]);
@@ -240,6 +244,7 @@ CREATE INDEX IF NOT EXISTS idx_plan_date ON plan(date);
         return true;
       };
       this.batch(() => {
+        for (const d of depts) take('depts', d);
         for (const t of tags) take('tags', t);
         for (const p of products) take('products', p);
         for (const r of recipes) {
